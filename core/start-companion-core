@@ -15,6 +15,7 @@ SERVICES=(
     'ping',"$SERVICES_PATH/ping/main.py"
     'ttyd',"ttyd -p 8088 /usr/bin/tmux"
     'dnsmasq',"dnsmasq --no-daemon"
+    'hostapd',"hostapd -d /etc/hostapd/hostapd.conf"
 )
 
 tmux start-server -f /etc/tmux.conf
