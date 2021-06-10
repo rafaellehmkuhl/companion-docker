@@ -48,6 +48,8 @@ class EthernetManager:
     def __init__(self) -> None:
         self.settings = settings.Settings()
 
+        self.dhcp_server_gateway = "192.168.2.1"
+
         # Load settings and do the initial configuration
         if not self.settings.load():
             logger.error("Failed to load previous settings.")
@@ -97,6 +99,10 @@ class EthernetManager:
         if mode == InterfaceMode.Client:
             self.set_dynamic_ip(name)
             logger.info(f"Interface '{name}' configured with dynamic IP.")
+            return True
+        if mode == InterfaceMode.Server:
+            self.set_static_ip(name, self.dhcp_server_gateway)
+            logger.info(f"Interface '{name}' configured as DHCP server with static IP.")
             return True
         if mode == InterfaceMode.Unmanaged:
             self.set_static_ip(name, ip)
@@ -296,9 +302,13 @@ class EthernetManager:
                 ip = address.address if valid_ip else "undefined"
 
                 is_static_ip = self.is_static_ip(ip)
+                is_gateway_ip = ip == self.dhcp_server_gateway
 
                 # Populate our output item
-                mode = InterfaceMode.Unmanaged if is_static_ip and valid_ip else InterfaceMode.Client
+                if is_gateway_ip:
+                    mode = InterfaceMode.Server
+                else:
+                    mode = InterfaceMode.Unmanaged if is_static_ip and valid_ip else InterfaceMode.Client
                 info = self.get_interface_info(interface)
                 data = EthernetInterface(
                     name=interface, configuration=InterfaceConfiguration(ip=ip, mode=mode), info=info
