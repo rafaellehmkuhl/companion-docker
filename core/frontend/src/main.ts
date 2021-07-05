@@ -3,6 +3,10 @@ import App from './App.vue'
 import router from './router'
 import store from './store'
 import vuetify from './plugins/vuetify'
+import { config } from 'vuex-module-decorators'
+
+// Set rawError to true by default on all @Action decorators
+config.rawError = true
 
 new Vue({
   router,
