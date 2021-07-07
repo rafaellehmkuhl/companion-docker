@@ -13,6 +13,7 @@
         />
 
         <v-spacer />
+        <wifi-tray-menu />
       </v-app-bar>
     </v-card>
 
@@ -62,15 +63,21 @@
     <v-main>
       <router-view />
     </v-main>
+    <wifi-updater />
   </v-app>
 </template>
 
 <script lang="ts">
 import Vue from 'vue'
+import WifiTrayMenu from './components/wifi/WifiTrayMenu.vue'
+import WifiUpdater from './components/wifi/WifiUpdater.vue'
 
 export default Vue.extend({
   name: 'App',
-
+  components: {
+    WifiTrayMenu,
+    WifiUpdater,
+  },
   data: () => ({
     drawer: false,
   }),
