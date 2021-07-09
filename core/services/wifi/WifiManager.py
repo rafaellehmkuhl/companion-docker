@@ -84,7 +84,7 @@ class WifiManager:
     def get_wifi_available(self) -> List[ScannedWifiNetwork]:
         """Get a dict from the wifi signals available"""
         try:
-            self.wpa.send_command_scan()
+            self.wpa.send_command_scan(timeout=15)
             data = self.wpa.send_command_scan_results()
             networks_list = WifiManager.__dict_from_table(data)
             return [ScannedWifiNetwork(**network) for network in networks_list]
