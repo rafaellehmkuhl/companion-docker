@@ -15,6 +15,7 @@ class WifiManager:
             path {[tuple/str]} -- Can be a tuple to connect (ip/port) or unix socket file
         """
         self.wpa.run(path)
+        self.scanning = False
 
     @staticmethod
     def __decode_escaped(data: bytes) -> str:
@@ -81,13 +82,18 @@ class WifiManager:
 
     async def get_wifi_available(self) -> List[ScannedWifiNetwork]:
         """Get a dict from the wifi signals available"""
-        try:
-            await self.wpa.send_command_scan(timeout=15)
-            data = await self.wpa.send_command_scan_results()
-            networks_list = WifiManager.__dict_from_table(data)
-            return [ScannedWifiNetwork(**network) for network in networks_list]
-        except Exception as error:
-            raise FetchError("Failed to fetch wifi list.") from error
+        if not self.scanning:
+            self.scanning = True
+            try:
+                await self.wpa.send_command_scan(timeout=15)
+            except Exception as error:
+                raise FetchError("Failed to fetch wifi list.") from error
+            finally:
+                self.scanning = False
+
+        data = await self.wpa.send_command_scan_results()
+        networks_list = WifiManager.__dict_from_table(data)
+        return [ScannedWifiNetwork(**network) for network in networks_list]
 
     async def get_saved_wifi_network(self) -> List[SavedWifiNetwork]:
         """Get a list of saved wifi networks"""
