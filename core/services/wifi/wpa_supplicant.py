@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from typing import Optional, Tuple, Union
 
+from loguru import logger
+
 from exceptions import BusyError, SockCommError
 
 
@@ -48,7 +50,7 @@ class WPASupplicant:
 
     async def send_command(self, command: str, timeout: float) -> bytes:
         """Send a specific command"""
-        print(">", command)
+        logger.info(f">\n{command}")
 
         assert self.sock, "No socket assigned to WPA Supplicant"
 
@@ -64,13 +66,13 @@ class WPASupplicant:
                 raise SockCommError("Could not communicate with WPA Supplicant socket.") from error
 
             if b"FAIL-BUSY" in data:
-                print(f"Busy during {command} operation. Trying again...")
+                logger.info(f"Busy during {command} operation. Trying again...")
                 await asyncio.sleep(0.5)
                 continue
             break
 
         if self.verbose and data:
-            print("<", data.decode("utf-8").strip())
+            logger.info(f"<\n{data.decode('utf-8').strip()}")
 
         return data
 
