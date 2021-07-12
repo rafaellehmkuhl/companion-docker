@@ -113,10 +113,10 @@ class WifiManager:
         try:
             data = await self.wpa.send_command_add_network()
             data = data.strip()
-            if data == b"Fail":
+            if not data.isdigit():
                 raise RuntimeError("Failed to add new network.")
 
-            network_number = data.decode("utf-8")
+            network_number = int(data)
             await self.wpa.send_command_set_network(str(network_number), "ssid", f'"{credentials.ssid}"')
             await self.wpa.send_command_set_network(str(network_number), "psk", f'"{credentials.password}"')
             await self.wpa.send_command_save_config()
@@ -132,7 +132,7 @@ class WifiManager:
             ssid {str} -- Network SSID
         """
         try:
-            await self.wpa.send_command_enable_network(str(network_id))
+            await self.wpa.send_command_enable_network(network_id)
             await self.wpa.send_command_reconnect()
         except Exception as error:
             raise ConnectionError("Failed to connect to network.") from error
