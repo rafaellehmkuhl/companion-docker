@@ -138,13 +138,17 @@ class WifiManager:
         except Exception as error:
             raise ConnectionError("Failed to remove existing network.") from error
 
-    async def connect_to_network(self, network_id: int) -> Any:
+    async def connect_to_network(self, network_id: int, force_connection: bool = True) -> Any:
         """Connect to wifi network
 
         Arguments:
             ssid {str} -- Network SSID
         """
         try:
+            if force_connection:
+                saved_networks = await self.get_saved_wifi_network()
+                for network in saved_networks:
+                    await self.wpa.send_command_disable_network(network.networkid)
             await self.wpa.send_command_enable_network(network_id)
             await self.wpa.send_command_reconnect()
         except Exception as error:
