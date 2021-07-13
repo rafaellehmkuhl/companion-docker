@@ -118,7 +118,10 @@ class WifiManager:
 
             network_number = int(data)
             await self.wpa.send_command_set_network(str(network_number), "ssid", f'"{credentials.ssid}"')
-            await self.wpa.send_command_set_network(str(network_number), "psk", f'"{credentials.password}"')
+            if not credentials.password:
+                await self.wpa.send_command_set_network(network_number, "key_mgmt", "NONE")
+            else:
+                await self.wpa.send_command_set_network(str(network_number), "psk", f'"{credentials.password}"')
             await self.wpa.send_command_save_config()
             await self.wpa.send_command_reconfigure()
             return network_number
