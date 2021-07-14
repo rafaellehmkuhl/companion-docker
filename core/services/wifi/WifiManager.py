@@ -166,6 +166,9 @@ class WifiManager:
             network_id {int} -- Network ID provided by WPA Supplicant
         """
         try:
+            saved_networks = await self.get_saved_wifi_network()
+            for network in saved_networks:
+                await self.wpa.send_command_disable_network(network.networkid)
             await self.wpa.send_command_enable_network(network_id)
             await self.wpa.send_command_save_config()
             await self.wpa.send_command_reconfigure()
