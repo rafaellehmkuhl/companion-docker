@@ -206,7 +206,7 @@ class WPASupplicant:
         """
         return await self.send_command("TERMINATE", timeout)
 
-    async def send_command_bssid(self, network_id: str, BSSID: str, timeout: float = 1) -> bytes:
+    async def send_command_bssid(self, network_id: int, BSSID: str, timeout: float = 1) -> bytes:
         """Send message: BSSID
 
         Set preferred BSSID for a network. Network id can be received from the
@@ -253,7 +253,7 @@ class WPASupplicant:
         """
         return await self.send_command("BSS", timeout)
 
-    async def send_command_select_network(self, network_id: str, timeout: float = 1) -> bytes:
+    async def send_command_select_network(self, network_id: int, timeout: float = 1) -> bytes:
         """Send message: SELECT_NETWORK
 
         Select a network (disable others). Network id can be received from the
@@ -261,7 +261,7 @@ class WPASupplicant:
         """
         return await self.send_command(f"SELECT_NETWORK {network_id}", timeout)
 
-    async def send_command_enable_network(self, network_id: str, timeout: float = 1) -> bytes:
+    async def send_command_enable_network(self, network_id: int, timeout: float = 1) -> bytes:
         """Send message: ENABLE_NETWORK
 
         Enable a network. Network id can be received from the  <code>LIST_NETWORKS</code>
@@ -270,7 +270,7 @@ class WPASupplicant:
         """
         return await self.send_command(f"ENABLE_NETWORK {network_id}", timeout)
 
-    async def send_command_disable_network(self, network_id: str, timeout: float = 1) -> bytes:
+    async def send_command_disable_network(self, network_id: int, timeout: float = 1) -> bytes:
         """Send message: DISABLE_NETWORK
 
         Disable a network. Network id can be received from the  <code>LIST_NETWORKS</code>
@@ -290,7 +290,7 @@ class WPASupplicant:
         """
         return await self.send_command("ADD_NETWORK", timeout)
 
-    async def send_command_remove_network(self, network_id: str, timeout: float = 1) -> bytes:
+    async def send_command_remove_network(self, network_id: int, timeout: float = 1) -> bytes:
         """Send message: REMOVE_NETWORK
 
         Remove a network. Network id can be received from the  <code>LIST_NETWORKS</code>
@@ -299,7 +299,7 @@ class WPASupplicant:
         """
         return await self.send_command(f"REMOVE_NETWORK {network_id}", timeout)
 
-    async def send_command_set_network(self, network_id: str, variable: str, value: str, timeout: float = 1) -> bytes:
+    async def send_command_set_network(self, network_id: int, variable: str, value: str, timeout: float = 1) -> bytes:
         """Send message: SET_NETWORK
 
         This command uses the same variables and data formats as the configuration
@@ -307,7 +307,7 @@ class WPASupplicant:
         """
         return await self.send_command(f"SET_NETWORK {network_id} {variable} {value}", timeout)
 
-    async def send_command_get_network(self, network_id: str, variable: str, timeout: float = 1) -> bytes:
+    async def send_command_get_network(self, network_id: int, variable: str, timeout: float = 1) -> bytes:
         """Send message: GET_NETWORK
 
         Get network variables. Network id can be received from the  <code>LIST_NETWORKS</code>
@@ -886,12 +886,12 @@ if __name__ == "__main__":
     time.sleep(1)
     wpa.send_command_list_networks()
     for i in range(5):
-        wpa.send_command_remove_network(str(i))
+        wpa.send_command_remove_network(i)
 
     wpa.send_command_add_network()
-    wpa.send_command_set_network("0", "ssid", '"wifi_ssid"')
-    wpa.send_command_set_network("0", "psk", '"wifi_password"')
-    wpa.send_command_enable_network("0")
+    wpa.send_command_set_network(0, "ssid", '"wifi_ssid"')
+    wpa.send_command_set_network(0, "psk", '"wifi_password"')
+    wpa.send_command_enable_network(0)
     wpa.send_command_save_config()
     wpa.send_command_reconfigure()
     while True:
