@@ -62,7 +62,14 @@ async def saved() -> Any:
 @version(1, 0)
 async def connect(credentials: WifiCredentials) -> Any:
     try:
-        await wifi_manager.set_wifi_password(credentials)
+        saved_networks = await wifi_manager.get_saved_wifi_network()
+        matched_networks = list(filter(lambda network: network.ssid == credentials.ssid, saved_networks))
+        if not matched_networks:
+            network_id = await wifi_manager.add_network(credentials)
+        else:
+            network_id = matched_networks[0].networkid
+
+        await wifi_manager.connect_to_network(network_id)
     except ConnectionError as error:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(error)) from error
 
