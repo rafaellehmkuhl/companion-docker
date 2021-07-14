@@ -84,6 +84,22 @@ async def connect(credentials: WifiCredentials) -> Any:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(error)) from error
 
 
+@app.post("/remove", summary="Remove saved wifi network.")
+@version(1, 0)
+async def remove(ssid: str) -> Any:
+    try:
+        saved_networks = await wifi_manager.get_saved_wifi_network()
+        for network in saved_networks:
+            if network.ssid == ssid:
+                await wifi_manager.remove_network(network.networkid)
+                return
+
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Network '{ssid}' not saved.")
+    except ConnectionError as error:
+        logger.exception(error)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(error)) from error
+
+
 @app.get("/disconnect", summary="Disconnect from wifi network.")
 @version(1, 0)
 async def disconnect() -> Any:
