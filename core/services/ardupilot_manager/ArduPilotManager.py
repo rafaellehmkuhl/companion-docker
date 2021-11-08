@@ -3,7 +3,7 @@ import os
 import pathlib
 import subprocess
 from copy import deepcopy
-from typing import Any, List, Optional, Set, Tuple
+from typing import Any, List, Optional, Set
 
 import psutil
 from commonwealth.mavlink_comm.VehicleManager import VehicleManager
@@ -23,7 +23,7 @@ from settings import Settings
 from typedefs import (
     EndpointType,
     Firmware,
-    FlightControllerType,
+    FlightController,
     Platform,
     SITLFrame,
     Vehicle,
@@ -62,7 +62,10 @@ class ArduPilotManager(metaclass=Singleton):
                 self.ardupilot_subprocess is not None and self.ardupilot_subprocess.poll() is not None
             ) or len(self.running_ardupilot_processes()) == 0
             needs_restart = self.should_be_running and (
-                (self.current_platform in [Platform.SITL, Platform.Navigator] and process_not_running)
+                (
+                    self.current_platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]
+                    and process_not_running
+                )
                 or self.current_platform == Platform.Undefined
             )
             if needs_restart:
@@ -105,10 +108,10 @@ class ArduPilotManager(metaclass=Singleton):
         self._current_sitl_frame = frame
         logger.info(f"Setting {frame.value} as frame for SITL.")
 
-    def start_navigator(self, navigator_type: FlightControllerType) -> None:
-        self.current_platform = Platform.Navigator
+    def start_navigator(self, board: FlightController) -> None:
+        self.current_platform = board.platform
         if not self.firmware_manager.is_firmware_installed(self.current_platform):
-            if navigator_type == FlightControllerType.NavigatorR3:
+            if board.platform == Platform.NavigatorR3:
                 self.firmware_manager.install_firmware_from_params(Vehicle.Sub, self.current_platform)
             else:
                 self.install_firmware_from_file(
@@ -151,10 +154,12 @@ class ArduPilotManager(metaclass=Singleton):
 
         self.start_mavlink_manager(master_endpoint)
 
-    def start_serial(self, device: str) -> None:
-        self.current_platform = Platform.Pixhawk1
+    def start_serial(self, board: FlightController) -> None:
+        if not board.path:
+            raise ValueError(f"Could not find device path for board {board.name}.")
+        self.current_platform = board.platform
         self.start_mavlink_manager(
-            Endpoint("Master", self.settings.app_name, EndpointType.Serial, device, 115200, protected=True)
+            Endpoint("Master", self.settings.app_name, EndpointType.Serial, board.path, 115200, protected=True)
         )
 
     def run_with_sitl(self, frame: SITLFrame = SITLFrame.VECTORED) -> None:
@@ -219,7 +224,7 @@ class ArduPilotManager(metaclass=Singleton):
         self.mavlink_manager.set_master_endpoint(device)
         self.mavlink_manager.start()
 
-    def start_board(self, boards: List[Tuple[FlightControllerType, str]]) -> bool:
+    def start_board(self, boards: List[FlightController]) -> bool:
         if not boards:
             return False
 
@@ -227,16 +232,16 @@ class ArduPilotManager(metaclass=Singleton):
             logger.warning(f"More than a single board detected: {boards}")
 
         # Sort by priority
-        boards.sort(key=lambda tup: tup[0].value)
+        boards.sort(key=lambda flight_controller: flight_controller.platform)
 
-        flight_controller_type, place = boards[0]
-        logger.info(f"Board in use: {flight_controller_type.name}.")
+        flight_controller = boards[0]
+        logger.info(f"Board in use: {flight_controller}.")
 
-        if flight_controller_type in [FlightControllerType.NavigatorR3, FlightControllerType.NavigatorR4]:
-            self.start_navigator(flight_controller_type)
+        if flight_controller.platform in [Platform.NavigatorR3, Platform.Navigator]:
+            self.start_navigator(flight_controller)
             return True
-        if FlightControllerType.Serial == flight_controller_type:
-            self.start_serial(place)
+        if flight_controller.platform == Platform.Pixhawk1:
+            self.start_serial(flight_controller)
             return True
         raise RuntimeError("Invalid board type: {boards}")
 
@@ -305,7 +310,7 @@ class ArduPilotManager(metaclass=Singleton):
         self.should_be_running = True
 
     async def restart_ardupilot(self) -> None:
-        if self.current_platform in [Platform.SITL, Platform.Navigator]:
+        if self.current_platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]:
             await self.kill_ardupilot()
             await self.start_ardupilot()
             return

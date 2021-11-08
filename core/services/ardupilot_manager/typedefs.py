@@ -1,5 +1,6 @@
-from enum import Enum, IntEnum
+from enum import Enum
 from platform import machine
+from typing import Optional
 
 from pydantic import BaseModel, HttpUrl
 
@@ -87,6 +88,7 @@ class Platform(str, Enum):
     The Enum values are 1:1 representations of the platforms available on the ArduPilot manifest."""
 
     Pixhawk1 = "Pixhawk1"
+    NavigatorR3 = "navigator"
     Navigator = "navigator"
     SITL = get_sitl_platform_name(machine())
     Undefined = "Undefined"
@@ -100,12 +102,13 @@ class FirmwareFormat(str, Enum):
     ELF = "ELF"
 
 
-class FlightControllerType(IntEnum):
-    """Supported flight-controller types."""
+class FlightController(BaseModel):
+    """Flight-controller board."""
 
-    Serial = 1
-    NavigatorR3 = 2
-    NavigatorR4 = 3
+    name: str
+    manufacturer: str
+    platform: Platform
+    path: Optional[str]
 
 
 class EndpointType(str, Enum):

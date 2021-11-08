@@ -1,10 +1,11 @@
 import os
-from typing import List, Tuple
+from typing import List, Optional
 
 from loguru import logger
+from serial.tools.list_ports_linux import comports
 from smbus2 import SMBus
 
-from typedefs import FlightControllerType
+from typedefs import FlightController, Platform
 
 
 class Detector:
@@ -18,12 +19,12 @@ class Detector:
         return os.geteuid() == 0
 
     @staticmethod
-    def detect_navigator_r3() -> Tuple[bool, str]:
-        """Check if navigator R3 is connected using the sensors on the I²C BUS
+    def get_navigator_r3_if_connected() -> Optional[FlightController]:
+        """Returns Navigator R3 if connected.
+        Check for connection using the sensors on the I²C BUS.
 
         Returns:
-            (bool, str): True if a navigator is connected, false otherwise.
-                String is always empty
+            Optional[FlightController]: Return flight-controller if connected, None otherwise.
         """
         try:
             bus = SMBus(1)
@@ -34,19 +35,19 @@ class Detector:
             PCA9685_address = 0x40
             bus.read_byte_data(PCA9685_address, 0)
 
-            return (True, "")
+            return FlightController(name="Navigator", manufacturer="Blue Robotics", platform=Platform.NavigatorR3)
         except Exception as error:
             logger.info("Navigator R3 not detected on I2C bus.")
             logger.debug(error)
-            return (False, "")
+            return None
 
     @staticmethod
-    def detect_navigator_r4() -> Tuple[bool, str]:
-        """Check if navigator R4 is connected using the sensors on the I²C BUS
+    def get_navigator_r4_if_connected() -> Optional[FlightController]:
+        """Returns Navigator R4 if connected.
+        Check for connection using the sensors on the I²C BUS.
 
         Returns:
-            (bool, str): True if a navigator is connected, false otherwise.
-                String is always empty
+            Optional[FlightController]: Return flight-controller if connected, None otherwise.
         """
         try:
             bus = SMBus(1)
@@ -63,44 +64,48 @@ class Detector:
             PCA9685_address = 0x40
             bus.read_byte_data(PCA9685_address, 0)
 
-            return (True, "")
+            return FlightController(name="Navigator", manufacturer="Blue Robotics", platform=Platform.Navigator)
         except Exception as error:
             logger.info("Navigator R4 not detected on I2C bus.")
             logger.debug(error)
-            return (False, "")
+            return None
 
     @staticmethod
-    def detect_serial_flight_controller() -> Tuple[bool, str]:
-        """Check if a pixhawk or any serial valid flight controller is connected
+    def detect_serial_flight_controllers() -> List[FlightController]:
+        """Check if pixhawks or other serial valid flight controllers are connected.
 
         Returns:
-            (bool, str): True if a serial flight controller is connected, false otherwise.
-                String will point to the serial device.
+            List[FlightController]: List of connected serial flight controllers.
         """
         serial_path = "/dev/autopilot"
-        result = (True, serial_path) if os.path.exists(serial_path) else (False, "")
-        return result
+        for port in comports(include_links=True):
+            if not port.device == serial_path:
+                continue
+            return [
+                FlightController(
+                    name=port.product, manufacturer=port.manufacturer, platform=Platform.Pixhawk1, path=serial_path
+                )
+            ]
+        return []
 
     @staticmethod
-    def detect() -> List[Tuple[FlightControllerType, str]]:
+    def detect() -> List[FlightController]:
         """Return a list of available flight controllers
 
         Returns:
-            (FlightControllerType, str): List of available flight controllers
+            List[FlightController]: List of available flight controllers
         """
         available = []
         if Detector._is_root():
             # We should detect R4 first since it shares some sensors as R3
-            result, path = Detector.detect_navigator_r4()
-            if result:
-                available.append((FlightControllerType.NavigatorR4, path))
+            navigator_r4 = Detector.get_navigator_r4_if_connected()
+            if navigator_r4:
+                available.append(navigator_r4)
             else:
-                result, path = Detector.detect_navigator_r3()
-                if result:
-                    available.append((FlightControllerType.NavigatorR3, path))
+                navigator_r3 = Detector.get_navigator_r3_if_connected()
+                if navigator_r3:
+                    available.append(navigator_r3)
 
-        result, path = Detector.detect_serial_flight_controller()
-        if result:
-            available.append((FlightControllerType.Serial, path))
+        available.extend(Detector().detect_serial_flight_controllers())
 
         return available
