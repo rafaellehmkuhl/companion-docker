@@ -88,7 +88,7 @@ def get_available_firmwares(response: Response, vehicle: Vehicle) -> Any:
 @version(1, 0)
 async def install_firmware_from_url(response: Response, url: str) -> Any:
     try:
-        await autopilot.kill_ardupilot()
+        await autopilot.stop_ardupilot()
         autopilot.install_firmware_from_url(url)
     except Exception as error:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -104,7 +104,7 @@ async def install_firmware_from_file(response: Response, binary: UploadFile = Fi
     try:
         with open(custom_firmware, "wb") as buffer:
             shutil.copyfileobj(binary.file, buffer)
-        await autopilot.kill_ardupilot()
+        await autopilot.stop_ardupilot()
         autopilot.install_firmware_from_file(custom_firmware)
         os.remove(custom_firmware)
     except InvalidFirmwareFile as error:
@@ -138,7 +138,7 @@ async def set_platform(response: Response, use_sitl: bool, sitl_frame: SITLFrame
         else:
             autopilot.platform = Platform.Undefined
         logger.debug("Restarting ardupilot...")
-        await autopilot.kill_ardupilot()
+        await autopilot.stop_ardupilot()
         await autopilot.start_ardupilot()
         logger.debug("Ardupilot successfully restarted.")
     except Exception as error:
@@ -162,7 +162,7 @@ async def restart(response: Response) -> Any:
 @version(1, 0)
 async def restore_default_firmware(response: Response) -> Any:
     try:
-        await autopilot.kill_ardupilot()
+        await autopilot.stop_ardupilot()
         autopilot.restore_default_firmware()
     except Exception as error:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -216,7 +216,7 @@ if __name__ == "__main__":
     server = Server(config)
 
     loop.create_task(autopilot.start_ardupilot())
-    loop.create_task(autopilot.auto_restart_ardupilot())
+    loop.create_task(autopilot.platform_manager.auto_restart_ardupilot_process())
     loop.create_task(autopilot.mavlink_manager.auto_restart_router())
     loop.run_until_complete(server.serve())
-    loop.run_until_complete(autopilot.kill_ardupilot())
+    loop.run_until_complete(autopilot.stop_ardupilot())

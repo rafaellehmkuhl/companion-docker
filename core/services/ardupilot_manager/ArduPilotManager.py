@@ -1,17 +1,13 @@
-import asyncio
 import os
 import pathlib
-import subprocess
 from copy import deepcopy
-from typing import Any, List, Optional, Set
+from typing import List, Optional, Set
 
-import psutil
 from commonwealth.mavlink_comm.VehicleManager import VehicleManager
 from commonwealth.utils.Singleton import Singleton
 from loguru import logger
 
 from exceptions import (
-    ArdupilotProcessKillFail,
     EndpointCreationFail,
     EndpointDeleteFail,
     NoBoardsConnected,
@@ -20,6 +16,7 @@ from exceptions import (
 )
 from firmware.FirmwareManagement import FirmwareManager
 from flight_controller.Detector import Detector as BoardDetector
+from flight_controller.PlatformManager import PlatformManager
 from mavlink_proxy.Endpoint import Endpoint
 from mavlink_proxy.Manager import Manager as MavlinkManager
 from settings import Settings
@@ -40,6 +37,7 @@ class ArduPilotManager(metaclass=Singleton):
         self.settings.create_app_folders()
         self.mavlink_manager = MavlinkManager()
         self.mavlink_manager.set_logdir(self.settings.log_path)
+        self.platform_manager = PlatformManager()
         self._current_platform: Platform = Platform.Undefined
         self._desired_platform: Platform = Platform.Undefined
         self._current_sitl_frame: SITLFrame = SITLFrame.UNDEFINED
@@ -53,39 +51,12 @@ class ArduPilotManager(metaclass=Singleton):
 
         self.configuration = deepcopy(self.settings.content)
         self._load_endpoints()
-        self.ardupilot_subprocess: Optional[Any] = None
         self.firmware_manager = FirmwareManager(self.settings.firmware_folder, self.settings.defaults_folder)
         self.vehicle_manager = VehicleManager()
 
         self._desired_board = self.get_board_to_be_used()
         self._current_board: Optional[FlightController] = None
         self.should_be_running = False
-
-    async def auto_restart_ardupilot(self) -> None:
-        """Auto-restart Ardupilot when it's not running but was supposed to."""
-        while True:
-            process_not_running = (
-                self.ardupilot_subprocess is not None and self.ardupilot_subprocess.poll() is not None
-            ) or len(self.running_ardupilot_processes()) == 0
-            needs_restart = self.should_be_running and (
-                (
-                    self._desired_platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]
-                    and process_not_running
-                )
-                or self._desired_platform != self._current_platform
-            )
-            if needs_restart:
-                logger.debug("Restarting ardupilot...")
-                try:
-                    await self.kill_ardupilot()
-                except Exception as error:
-                    logger.warning(f"Could not kill Ardupilot: {error}")
-                try:
-                    await self.start_ardupilot()
-                except Exception as error:
-                    logger.warning(f"Could not start Ardupilot: {error}")
-                self.should_be_running = True
-            await asyncio.sleep(5.0)
 
     def run_with_board(self) -> None:
         chosen_board = self.get_board_to_be_used()
@@ -140,34 +111,11 @@ class ArduPilotManager(metaclass=Singleton):
         master_endpoint = Endpoint(
             "Master", self.settings.app_name, EndpointType.UDPServer, "127.0.0.1", 8852, protected=True
         )
-
-        # Run ardupilot inside while loop to avoid exiting after reboot command
-        ## Can be changed back to a simple command after https://github.com/ArduPilot/ardupilot/issues/17572
-        ## gets fixed.
-        # pylint: disable=consider-using-with
-        #
-        # The mapping of serial ports works as in the following table:
-        #
-        # |    ArduSub   |       Navigator         |
-        # | -C = Serial1 | Serial1 => /dev/ttyS0   |
-        # | -B = Serial3 | Serial3 => /dev/ttyAMA1 |
-        # | -E = Serial4 | Serial4 => /dev/ttyAMA2 |
-        # | -F = Serial5 | Serial5 => /dev/ttyAMA3 |
-        #
-        # The first column comes from https://ardupilot.org/dev/docs/sitl-serial-mapping.html
-
-        self.ardupilot_subprocess = subprocess.Popen(
-            f"{self.firmware_manager.firmware_path(board.platform)}"
-            f" -A udp:{master_endpoint.place}:{master_endpoint.argument}"
-            f" --log-directory {self.settings.firmware_folder}/logs/"
-            f" --storage-directory {self.settings.firmware_folder}/storage/"
-            f" -C /dev/ttyS0"
-            f" -B /dev/ttyAMA1"
-            f" -E /dev/ttyAMA2"
-            f" -F /dev/ttyAMA3",
-            shell=True,
-            encoding="utf-8",
-            errors="ignore",
+        self.platform_manager.start_navigator_process(
+            master_endpoint,
+            self.firmware_manager.firmware_path(board.platform),
+            pathlib.Path("f{self.settings.firmware_folder}/logs/"),
+            pathlib.Path("f{self.settings.firmware_folder}/storage/"),
         )
 
         self.start_mavlink_manager(master_endpoint)
@@ -196,24 +144,16 @@ class ArduPilotManager(metaclass=Singleton):
         master_endpoint = Endpoint(
             "Master", self.settings.app_name, EndpointType.TCPServer, "127.0.0.1", 5760, protected=True
         )
-        # pylint: disable=consider-using-with
-        self.ardupilot_subprocess = subprocess.Popen(
-            [
-                self.firmware_manager.firmware_path(Platform.SITL),
-                "--model",
-                self.current_sitl_frame.value,
-                "--base-port",
-                str(master_endpoint.argument),
-                "--home",
-                "-27.563,-48.459,0.0,270.0",
-            ],
-            shell=False,
-            encoding="utf-8",
-            errors="ignore",
+
+        self.platform_manager.start_sitl_process(
+            master_endpoint,
+            self.firmware_manager.firmware_path(board.platform),
+            self.current_sitl_frame,
         )
 
         self.start_mavlink_manager(master_endpoint)
         self._current_platform = Platform.SITL
+        self._current_board = board
 
     def start_mavlink_manager(self, device: Endpoint) -> None:
         try:
@@ -280,61 +220,24 @@ class ArduPilotManager(metaclass=Singleton):
         connected_boards.sort(key=lambda board: board.platform)
         return connected_boards[0]
 
-    def running_ardupilot_processes(self) -> List[psutil.Process]:
-        """Return list of all Ardupilot process running on system."""
-
-        def is_ardupilot_process(process: psutil.Process) -> bool:
-            """Checks if given process is using Ardupilot's firmware file for current platform."""
-            return str(self.firmware_manager.firmware_path(self._current_platform)) in " ".join(process.cmdline())
-
-        return list(filter(is_ardupilot_process, psutil.process_iter()))
-
-    async def terminate_ardupilot_subprocess(self) -> None:
-        """Terminate Ardupilot subprocess."""
-        if self.ardupilot_subprocess:
-            self.ardupilot_subprocess.terminate()
-            for _ in range(10):
-                if self.ardupilot_subprocess.poll() is not None:
-                    logger.info("Ardupilot subprocess terminated.")
-                    return
-                logger.debug("Waiting for process to die...")
-                await asyncio.sleep(0.5)
-            raise ArdupilotProcessKillFail("Could not terminate Ardupilot subprocess.")
-        logger.warning("Ardupilot subprocess already not running.")
-
-    async def prune_ardupilot_processes(self) -> None:
-        """Kill all system processes using Ardupilot's firmware file."""
-        for process in self.running_ardupilot_processes():
-            try:
-                logger.debug(f"Killing Ardupilot process {process.name()}::{process.pid}.")
-                process.kill()
-                await asyncio.sleep(0.5)
-            except Exception as error:
-                raise ArdupilotProcessKillFail(f"Could not kill {process.name()}::{process.pid}.") from error
-
-    async def kill_ardupilot(self) -> None:
-        self.should_be_running = False
+    async def stop_ardupilot(self) -> None:
+        """Stop Ardupilot processes and communication."""
 
         if not self._current_platform == Platform.SITL:
             try:
                 logger.info("Disarming vehicle.")
                 self.vehicle_manager.disarm_vehicle()
-                logger.info("Vehicle disarmed.")
             except Exception as error:
                 logger.warning(f"Could not disarm vehicle: {error}. Proceeding with kill.")
 
-        # TODO: Add shutdown command on HAL_SITL and HAL_LINUX, changing terminate/prune
-        # logic with a simple "self.vehicle_manager.shutdown_vehicle()"
-        logger.info("Terminating Ardupilot subprocess.")
-        await self.terminate_ardupilot_subprocess()
-        logger.info("Ardupilot subprocess terminated.")
-        logger.info("Pruning Ardupilot's system processes.")
-        await self.prune_ardupilot_processes()
-        logger.info("Ardupilot's system processes pruned.")
+        logger.info("Stopping running ardupilot processes.")
+        try:
+            await self.platform_manager.kill_ardupilot_process()
+        except Exception as error:
+            logger.warning(f"Could not kill Ardupilot process. {error}")
 
         logger.info("Stopping Mavlink manager.")
         self.mavlink_manager.stop()
-        logger.info("Mavlink manager stopped.")
 
     async def start_ardupilot(self) -> None:
         try:
@@ -350,7 +253,7 @@ class ArduPilotManager(metaclass=Singleton):
 
     async def restart_ardupilot(self) -> None:
         if self._current_platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]:
-            await self.kill_ardupilot()
+            await self.stop_ardupilot()
             await self.start_ardupilot()
             return
         self.vehicle_manager.reboot_vehicle()
