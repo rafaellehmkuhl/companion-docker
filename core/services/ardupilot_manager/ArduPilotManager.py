@@ -1,3 +1,4 @@
+import asyncio
 import os
 import pathlib
 from copy import deepcopy
@@ -55,6 +56,23 @@ class ArduPilotManager(metaclass=Singleton):
 
         self._current_board: Optional[FlightController] = None
 
+    async def auto_connect_board(self) -> None:
+        """Periodically check for board disconnection and reconnect it."""
+        while True:
+            if self._current_board is not None and not BoardDetector.is_board_connected(self._current_board):
+                logger.warning("Board disconnected. Resetting connection.")
+                self._current_board = None
+
+            if self._current_board is None:
+                logger.warning("Trying board connection.")
+                try:
+                    await asyncio.sleep(1.0)
+                    await self.stop_ardupilot()
+                    await asyncio.sleep(1.0)
+                    await self.start_ardupilot()
+                except Exception as error:
+                    logger.warning(f"Could not connect board. {error}")
+            await asyncio.sleep(1.0)
 
     def run_with_board(self) -> None:
         chosen_board = self.get_board_to_be_used()
