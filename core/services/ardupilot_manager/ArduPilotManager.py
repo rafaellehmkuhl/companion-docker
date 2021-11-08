@@ -54,7 +54,7 @@ class ArduPilotManager(metaclass=Singleton):
         self.vehicle_manager = VehicleManager()
 
         self._current_board: Optional[FlightController] = None
-        self.should_be_running = False
+
 
     def run_with_board(self) -> None:
         chosen_board = self.get_board_to_be_used()
@@ -236,8 +236,6 @@ class ArduPilotManager(metaclass=Singleton):
         except Exception as error:
             logger.warning(f"Failed to start Ardupilot: {error}.")
             raise error
-        finally:
-            self.should_be_running = True
 
     async def restart_ardupilot(self) -> None:
         if self.platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]:
