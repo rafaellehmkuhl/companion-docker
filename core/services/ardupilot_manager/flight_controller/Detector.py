@@ -84,13 +84,23 @@ class Detector:
         def is_valid_flight_controller(port: SysFS) -> bool:
             return port.manufacturer == "ArduPilot" or (port.manufacturer == "3D Robotics" and "PX4" in port.product)
 
-        return [
-            FlightController(
-                name=port.product, manufacturer=port.manufacturer, platform=Platform.Pixhawk1, path=port.device
+        serial_boards = []
+        for port in comports():
+            try:
+                board_type = BoardIdentifier.get_board_type(port.device)
+                board_platform = BoardIdentifier.get_board_platform(board_type)
+            except Exception as error:
+                logger.warning(f"Could not identify board on {port}. {error}")
+                board_platform = Platform.GenericSerial
+            if not is_valid_flight_controller(port):
+                continue
+            serial_boards.append(
+                FlightController(
+                    name=port.product, manufacturer=port.manufacturer, platform=board_platform, path=port.device
+                )
             )
-            for port in comports()
-            if is_valid_flight_controller(port)
-        ]
+
+        return serial_boards
 
     @staticmethod
     def detect() -> List[FlightController]:

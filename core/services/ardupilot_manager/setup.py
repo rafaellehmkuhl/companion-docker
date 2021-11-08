@@ -43,6 +43,7 @@ static_files = [
         "ardupilot_navigator_r4",
         "https://s3.us-west-1.amazonaws.com/ardusub.bluerobotics.com/test-builds/ardusub-a09013c6-navigator-r4-preview",
     ),
+    StaticFile(defaults_folder, "ardupilot_fmuv5", "https://firmware.ardupilot.org/Sub/latest/fmuv5/ardusub.apj"),
     StaticFile(defaults_folder, "ardupilot_pixhawk1", "https://firmware.ardupilot.org/Sub/latest/Pixhawk1/ardusub.apj"),
 ]
 

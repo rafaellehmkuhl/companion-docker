@@ -145,7 +145,7 @@ class FirmwareInstaller:
         self.validate_firmware(new_firmware_path, board)
 
         try:
-            if board.platform == Platform.Pixhawk1:
+            if board.platform in [Platform.Pixhawk1, Platform.Pixhawk4, Platform.GenericSerial]:
                 firmware_uploader = FirmwareUploader()
                 if not board.path:
                     raise ValueError("Board path not available.")

@@ -18,6 +18,11 @@ def test_firmware_validation() -> None:
     board_type = BoardIdentifier.get_platform_board_type(Platform.Pixhawk1)
     installer._validate_apj(temporary_file, board_type)
 
+    # Pixhawk4 APJ firmwares should always work
+    temporary_file = downloader.download(Vehicle.Sub, Platform.Pixhawk4)
+    board_type = BoardIdentifier.get_platform_board_type(Platform.Pixhawk1)
+    installer._validate_apj(temporary_file, board_type)
+
     # New SITL firmwares should always work
     temporary_file = downloader.download(Vehicle.Sub, Platform.SITL, version="DEV")
     installer._validate_elf(temporary_file, Platform.SITL)

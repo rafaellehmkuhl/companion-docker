@@ -44,7 +44,7 @@ class FirmwareManager:
         if platform == Platform.Undefined:
             raise UndefinedPlatform("Platform is undefined. Cannot verify if firmware is installed.")
 
-        if board.platform == Platform.Pixhawk1:
+        if board.platform in [Platform.Pixhawk1, Platform.Pixhawk4, Platform.GenericSerial]:
             # Assumes for now that a Pixhawk always has a firmware installed, which is true most of the time
             # TODO: Validate if properly. The uploader tool seems capable of doing this.
             return True
@@ -73,7 +73,7 @@ class FirmwareManager:
 
     def install_firmware_from_file(self, new_firmware_path: pathlib.Path, board: FlightController) -> None:
         try:
-            if board.platform == Platform.Pixhawk1:
+            if board.platform in [Platform.Pixhawk1, Platform.Pixhawk4, Platform.GenericSerial]:
                 self.firmware_installer.install_firmware(new_firmware_path, board)
             else:
                 self.firmware_installer.install_firmware(new_firmware_path, board, self.firmware_path(board.platform))

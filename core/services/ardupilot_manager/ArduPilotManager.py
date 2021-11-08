@@ -81,7 +81,7 @@ class ArduPilotManager(metaclass=Singleton):
         if chosen_board.platform in [Platform.NavigatorR3, Platform.Navigator]:
             self.start_navigator(chosen_board)
             return
-        if chosen_board.platform == Platform.Pixhawk1:
+        if chosen_board.platform in [Platform.Pixhawk1, Platform.Pixhawk4, Platform.GenericSerial]:
             self.start_serial(chosen_board)
             return
 

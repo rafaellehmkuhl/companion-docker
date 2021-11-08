@@ -19,6 +19,7 @@ from exceptions import (
     ManifestUnavailable,
     MoreThanOneCandidate,
     NoVersionAvailable,
+    UnsupportedPlatform,
 )
 from typedefs import FirmwareFormat, Platform, Vehicle
 
@@ -33,6 +34,7 @@ class FirmwareDownloader:
     _supported_firmware_formats = {
         Platform.SITL: FirmwareFormat.ELF,
         Platform.Pixhawk1: FirmwareFormat.APJ,
+        Platform.Pixhawk4: FirmwareFormat.APJ,
         Platform.NavigatorR3: FirmwareFormat.ELF,
         Platform.Navigator: FirmwareFormat.ELF,
     }
@@ -141,6 +143,9 @@ class FirmwareDownloader:
         Returns:
             List[str]: List of available versions that match the specific desired configuration.
         """
+        if platform in [Platform.GenericSerial, Platform.Undefined, Platform.Unknown]:
+            raise UnsupportedPlatform(f"Can't find available versions for platform of type {platform.value}.")
+
         available_versions: List[str] = []
 
         if not self._manifest_is_valid():
@@ -166,6 +171,9 @@ class FirmwareDownloader:
         Returns:
             str: URL of valid firmware.
         """
+        if platform in [Platform.GenericSerial, Platform.Undefined, Platform.Unknown]:
+            raise UnsupportedPlatform(f"Can't find download URL for platform of type {platform.value}.")
+
         versions = self.get_available_versions(vehicle, platform)
         logger.debug(f"Got following versions for {vehicle} running {platform}: {versions}")
 
@@ -221,5 +229,7 @@ class FirmwareDownloader:
         Returns:
             pathlib.Path: Temporary path for the firmware file.
         """
+        if platform in [Platform.GenericSerial, Platform.Undefined, Platform.Unknown]:
+            raise UnsupportedPlatform(f"Platform of type {platform.value} does not have firmware download support.")
         url = self.get_download_url(vehicle, platform, version)
         return FirmwareDownloader._download(url)
