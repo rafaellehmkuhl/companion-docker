@@ -132,11 +132,9 @@ def platform(response: Response) -> Any:
 @version(1, 0)
 async def set_platform(response: Response, use_sitl: bool, sitl_frame: SITLFrame = SITLFrame.VECTORED) -> Any:
     try:
-        if use_sitl:
-            autopilot.platform = Platform.SITL
-            autopilot.current_sitl_frame = sitl_frame
-        else:
-            autopilot.platform = Platform.Undefined
+        autopilot.use_sitl = use_sitl
+        autopilot.current_sitl_frame = sitl_frame
+
         logger.debug("Restarting ardupilot...")
         await autopilot.stop_ardupilot()
         await autopilot.start_ardupilot()
@@ -207,7 +205,7 @@ app.mount("/", StaticFiles(directory=str(FRONTEND_FOLDER), html=True))
 
 if __name__ == "__main__":
     if args.sitl:
-        autopilot.platform = Platform.SITL
+        autopilot.use_sitl = True
 
     loop = asyncio.new_event_loop()
 

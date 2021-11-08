@@ -38,7 +38,7 @@ class ArduPilotManager(metaclass=Singleton):
         self.mavlink_manager = MavlinkManager()
         self.mavlink_manager.set_logdir(self.settings.log_path)
         self.platform_manager = PlatformManager()
-        self._desired_platform: Platform = Platform.Undefined
+        self.use_sitl = False
         self._current_sitl_frame: SITLFrame = SITLFrame.UNDEFINED
 
         # Load settings and do the initial configuration
@@ -62,7 +62,6 @@ class ArduPilotManager(metaclass=Singleton):
         logger.info(f"Using {chosen_board.name} flight-controller.")
 
         self._desired_board = chosen_board
-        self._desired_platform = chosen_board.platform
 
         if chosen_board.platform in [Platform.NavigatorR3, Platform.Navigator]:
             self.start_navigator(chosen_board)
@@ -83,12 +82,6 @@ class ArduPilotManager(metaclass=Singleton):
         if not self._current_board:
             return Platform.Undefined
         return self._current_board.platform
-
-    @platform.setter
-    def platform(self, platform: Platform) -> None:
-        """Setting platform externally makes ArduPilotManager go through the necessary steps to make it run."""
-        self._desired_platform = platform
-        logger.info(f"Setting {platform} as desired platform.")
 
     @property
     def current_sitl_frame(self) -> SITLFrame:
@@ -239,7 +232,7 @@ class ArduPilotManager(metaclass=Singleton):
 
     async def start_ardupilot(self) -> None:
         try:
-            if self._desired_platform == Platform.SITL:
+            if self.use_sitl:
                 self.run_with_sitl(self.current_sitl_frame)
                 return
             self.run_with_board()
