@@ -53,15 +53,12 @@ class ArduPilotManager(metaclass=Singleton):
         self.firmware_manager = FirmwareManager(self.settings.firmware_folder, self.settings.defaults_folder)
         self.vehicle_manager = VehicleManager()
 
-        self._desired_board = self.get_board_to_be_used()
         self._current_board: Optional[FlightController] = None
         self.should_be_running = False
 
     def run_with_board(self) -> None:
         chosen_board = self.get_board_to_be_used()
         logger.info(f"Using {chosen_board.name} flight-controller.")
-
-        self._desired_board = chosen_board
 
         if chosen_board.platform in [Platform.NavigatorR3, Platform.Navigator]:
             self.start_navigator(chosen_board)
