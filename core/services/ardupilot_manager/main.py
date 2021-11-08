@@ -122,7 +122,7 @@ async def install_firmware_from_file(response: Response, binary: UploadFile = Fi
 @version(1, 0)
 def platform(response: Response) -> Any:
     try:
-        return autopilot.current_platform
+        return autopilot.platform
     except Exception as error:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         return {"message": f"{error}"}
@@ -133,10 +133,10 @@ def platform(response: Response) -> Any:
 async def set_platform(response: Response, use_sitl: bool, sitl_frame: SITLFrame = SITLFrame.VECTORED) -> Any:
     try:
         if use_sitl:
-            autopilot.current_platform = Platform.SITL
+            autopilot.platform = Platform.SITL
             autopilot.current_sitl_frame = sitl_frame
         else:
-            autopilot.current_platform = Platform.Undefined
+            autopilot.platform = Platform.Undefined
         logger.debug("Restarting ardupilot...")
         await autopilot.kill_ardupilot()
         await autopilot.start_ardupilot()
@@ -207,7 +207,7 @@ app.mount("/", StaticFiles(directory=str(FRONTEND_FOLDER), html=True))
 
 if __name__ == "__main__":
     if args.sitl:
-        autopilot.current_platform = Platform.SITL
+        autopilot.platform = Platform.SITL
 
     loop = asyncio.new_event_loop()
 

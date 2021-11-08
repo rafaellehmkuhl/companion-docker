@@ -40,6 +40,7 @@ class ArduPilotManager(metaclass=Singleton):
         self.mavlink_manager = MavlinkManager()
         self.mavlink_manager.set_logdir(self.settings.log_path)
         self._current_platform: Platform = Platform.Undefined
+        self._desired_platform: Platform = Platform.Undefined
         self._current_sitl_frame: SITLFrame = SITLFrame.UNDEFINED
 
         # Load settings and do the initial configuration
@@ -65,10 +66,10 @@ class ArduPilotManager(metaclass=Singleton):
             ) or len(self.running_ardupilot_processes()) == 0
             needs_restart = self.should_be_running and (
                 (
-                    self.current_platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]
+                    self._desired_platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]
                     and process_not_running
                 )
-                or self.current_platform == Platform.Undefined
+                or self._desired_platform != self._current_platform
             )
             if needs_restart:
                 logger.debug("Restarting ardupilot...")
@@ -87,6 +88,8 @@ class ArduPilotManager(metaclass=Singleton):
         chosen_board = self.get_board_to_be_used()
         logger.info(f"Using {chosen_board.name} flight-controller.")
 
+        self._desired_platform = chosen_board.platform
+
         if chosen_board.platform in [Platform.NavigatorR3, Platform.Navigator]:
             self.start_navigator(chosen_board)
             return
@@ -102,13 +105,14 @@ class ArduPilotManager(metaclass=Singleton):
             raise RuntimeError("ArduPilot manager needs to run with root privilege.")
 
     @property
-    def current_platform(self) -> Platform:
+    def platform(self) -> Platform:
         return self._current_platform
 
-    @current_platform.setter
-    def current_platform(self, platform: Platform) -> None:
-        self._current_platform = platform
-        logger.info(f"Setting {platform} as current platform.")
+    @platform.setter
+    def platform(self, platform: Platform) -> None:
+        """Setting platform externally makes ArduPilotManager go through the necessary steps to make it run."""
+        self._desired_platform = platform
+        logger.info(f"Setting {platform} as desired platform.")
 
     @property
     def current_sitl_frame(self) -> SITLFrame:
@@ -120,10 +124,9 @@ class ArduPilotManager(metaclass=Singleton):
         logger.info(f"Setting {frame.value} as frame for SITL.")
 
     def start_navigator(self, board: FlightController) -> None:
-        self.current_platform = board.platform
-        if not self.firmware_manager.is_firmware_installed(self.current_platform):
+        if not self.firmware_manager.is_firmware_installed(board.platform):
             if board.platform == Platform.NavigatorR3:
-                self.firmware_manager.install_firmware_from_params(Vehicle.Sub, self.current_platform)
+                self.firmware_manager.install_firmware_from_params(Vehicle.Sub, board.platform)
             else:
                 self.install_firmware_from_file(
                     pathlib.Path("/root/companion-files/ardupilot-manager/default/ardupilot_navigator_r4")
@@ -150,7 +153,7 @@ class ArduPilotManager(metaclass=Singleton):
         # The first column comes from https://ardupilot.org/dev/docs/sitl-serial-mapping.html
 
         self.ardupilot_subprocess = subprocess.Popen(
-            f"{self.firmware_manager.firmware_path(self.current_platform)}"
+            f"{self.firmware_manager.firmware_path(board.platform)}"
             f" -A udp:{master_endpoint.place}:{master_endpoint.argument}"
             f" --log-directory {self.settings.firmware_folder}/logs/"
             f" --storage-directory {self.settings.firmware_folder}/storage/"
@@ -164,19 +167,19 @@ class ArduPilotManager(metaclass=Singleton):
         )
 
         self.start_mavlink_manager(master_endpoint)
+        self._current_platform = board.platform
 
     def start_serial(self, board: FlightController) -> None:
         if not board.path:
             raise ValueError(f"Could not find device path for board {board.name}.")
-        self.current_platform = board.platform
         self.start_mavlink_manager(
             Endpoint("Master", self.settings.app_name, EndpointType.Serial, board.path, 115200, protected=True)
         )
+        self.current_platform = board.platform
 
     def run_with_sitl(self, frame: SITLFrame = SITLFrame.VECTORED) -> None:
-        self.current_platform = Platform.SITL
-        if not self.firmware_manager.is_firmware_installed(self.current_platform):
-            self.firmware_manager.install_firmware_from_params(Vehicle.Sub, self.current_platform)
+        if not self.firmware_manager.is_firmware_installed(Platform.SITL):
+            self.firmware_manager.install_firmware_from_params(Vehicle.Sub, Platform.SITL)
         if frame == SITLFrame.UNDEFINED:
             frame = SITLFrame.VECTORED
             logger.warning(f"SITL frame is undefined. Setting {frame} as current frame.")
@@ -189,7 +192,7 @@ class ArduPilotManager(metaclass=Singleton):
         # pylint: disable=consider-using-with
         self.ardupilot_subprocess = subprocess.Popen(
             [
-                self.firmware_manager.firmware_path(self.current_platform),
+                self.firmware_manager.firmware_path(Platform.SITL),
                 "--model",
                 self.current_sitl_frame.value,
                 "--base-port",
@@ -203,6 +206,7 @@ class ArduPilotManager(metaclass=Singleton):
         )
 
         self.start_mavlink_manager(master_endpoint)
+        self._current_platform = Platform.SITL
 
     def start_mavlink_manager(self, device: Endpoint) -> None:
         try:
@@ -274,7 +278,7 @@ class ArduPilotManager(metaclass=Singleton):
 
         def is_ardupilot_process(process: psutil.Process) -> bool:
             """Checks if given process is using Ardupilot's firmware file for current platform."""
-            return str(self.firmware_manager.firmware_path(self.current_platform)) in " ".join(process.cmdline())
+            return str(self.firmware_manager.firmware_path(self._current_platform)) in " ".join(process.cmdline())
 
         return list(filter(is_ardupilot_process, psutil.process_iter()))
 
@@ -304,7 +308,7 @@ class ArduPilotManager(metaclass=Singleton):
     async def kill_ardupilot(self) -> None:
         self.should_be_running = False
 
-        if not self.current_platform == Platform.SITL:
+        if not self._current_platform == Platform.SITL:
             try:
                 logger.info("Disarming vehicle.")
                 self.vehicle_manager.disarm_vehicle()
@@ -326,7 +330,7 @@ class ArduPilotManager(metaclass=Singleton):
         logger.info("Mavlink manager stopped.")
 
     async def start_ardupilot(self) -> None:
-        if self.current_platform == Platform.SITL:
+        if self._desired_platform == Platform.SITL:
             self.run_with_sitl(self.current_sitl_frame)
             self.should_be_running = True
             return
@@ -334,7 +338,7 @@ class ArduPilotManager(metaclass=Singleton):
         self.should_be_running = True
 
     async def restart_ardupilot(self) -> None:
-        if self.current_platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]:
+        if self._current_platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]:
             await self.kill_ardupilot()
             await self.start_ardupilot()
             return
@@ -404,13 +408,13 @@ class ArduPilotManager(metaclass=Singleton):
                 raise EndpointDeleteFail(f"Failed to remove endpoint '{endpoint.name}': {error}") from error
 
     def get_available_firmwares(self, vehicle: Vehicle) -> List[Firmware]:
-        return self.firmware_manager.get_available_firmwares(vehicle, self.current_platform)
+        return self.firmware_manager.get_available_firmwares(vehicle, self._current_platform)
 
     def install_firmware_from_file(self, firmware_path: pathlib.Path) -> None:
-        self.firmware_manager.install_firmware_from_file(firmware_path, self.current_platform)
+        self.firmware_manager.install_firmware_from_file(firmware_path, self._current_platform)
 
     def install_firmware_from_url(self, url: str) -> None:
-        self.firmware_manager.install_firmware_from_url(url, self.current_platform)
+        self.firmware_manager.install_firmware_from_url(url, self._current_platform)
 
     def restore_default_firmware(self) -> None:
-        self.firmware_manager.restore_default_firmware(self.current_platform)
+        self.firmware_manager.restore_default_firmware(self._current_platform)
