@@ -14,6 +14,7 @@ from exceptions import (
     ArdupilotProcessKillFail,
     EndpointCreationFail,
     EndpointDeleteFail,
+    NoPreferredBoardSet,
 )
 from firmware.FirmwareManagement import FirmwareManager
 from flight_controller_detector.Detector import Detector as BoardDetector
@@ -224,6 +225,33 @@ class ArduPilotManager(metaclass=Singleton):
         self.mavlink_manager.set_master_endpoint(device)
         self.mavlink_manager.start()
 
+    def set_preferred_board(self, board: FlightController) -> None:
+        logger.info(f"Setting {board.name} as preferred flight-controller.")
+        self.configuration["preferred_board"] = board.dict(exclude={"path"})
+        self.settings.save(self.configuration)
+
+    def get_preferred_board(self) -> FlightController:
+        preferred_board = self.configuration.get("preferred_board")
+        if not preferred_board:
+            raise NoPreferredBoardSet("Preferred board not set yet.")
+        return FlightController(**preferred_board)
+
+    def get_board_to_be_used(self, boards: List[FlightController]) -> FlightController:
+        """Check if preferred board exists and is connected. If so, use it, otherwise, choose by priority."""
+        try:
+            preferred_board = self.get_preferred_board()
+            logger.info(f"Preferred flight-controller is {preferred_board.name}.")
+            for board in boards:
+                # Compare connected boards with saved board, excluding path (which can change between sessions)
+                if preferred_board.dict(exclude={"path"}).items() <= board.dict().items():
+                    return board
+            logger.info(f"Flight-controller {preferred_board.name} not connected.")
+        except NoPreferredBoardSet as error:
+            logger.info(error)
+
+        boards.sort(key=lambda board: board.platform)
+        return boards[0]
+
     def start_board(self, boards: List[FlightController]) -> bool:
         if not boards:
             return False
@@ -231,11 +259,9 @@ class ArduPilotManager(metaclass=Singleton):
         if len(boards) > 1:
             logger.warning(f"More than a single board detected: {boards}")
 
-        # Sort by priority
-        boards.sort(key=lambda flight_controller: flight_controller.platform)
+        flight_controller = self.get_board_to_be_used(boards)
 
-        flight_controller = boards[0]
-        logger.info(f"Board in use: {flight_controller}.")
+        logger.info(f"Using {flight_controller.name} flight-controller.")
 
         if flight_controller.platform in [Platform.NavigatorR3, Platform.Navigator]:
             self.start_navigator(flight_controller)

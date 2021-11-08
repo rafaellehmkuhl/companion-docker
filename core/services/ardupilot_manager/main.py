@@ -181,6 +181,26 @@ def available_boards(response: Response) -> Any:
         return {"message": f"{error}"}
 
 
+@app.get("/preferred_board", response_model=FlightController, summary="Retrieve which board is preferred.")
+@version(1, 0)
+def get_preferred_board(response: Response) -> Any:
+    try:
+        return autopilot.get_preferred_board()
+    except Exception as error:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return {"message": f"{error}"}
+
+
+@app.post("/preferred_board", summary="Set preferred board.")
+@version(1, 0)
+def set_preferred_board(response: Response, board: FlightController) -> Any:
+    try:
+        return autopilot.set_preferred_board(board)
+    except Exception as error:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return {"message": f"{error}"}
+
+
 app = VersionedFastAPI(app, version="1.0.0", prefix_format="/v{major}.{minor}", enable_latest=True)
 app.mount("/", StaticFiles(directory=str(FRONTEND_FOLDER), html=True))
 

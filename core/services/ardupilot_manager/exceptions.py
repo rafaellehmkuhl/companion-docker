@@ -69,3 +69,7 @@ class EndpointDeleteFail(RuntimeError):
 
 class MavlinkRouterStartFail(RuntimeError):
     """Failed to initiate Mavlink router."""
+
+
+class NoPreferredBoardSet(RuntimeError):
+    """No preferred board is set yet."""
