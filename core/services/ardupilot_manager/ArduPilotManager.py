@@ -38,7 +38,6 @@ class ArduPilotManager(metaclass=Singleton):
         self.mavlink_manager = MavlinkManager()
         self.mavlink_manager.set_logdir(self.settings.log_path)
         self.platform_manager = PlatformManager()
-        self._current_platform: Platform = Platform.Undefined
         self._desired_platform: Platform = Platform.Undefined
         self._current_sitl_frame: SITLFrame = SITLFrame.UNDEFINED
 
@@ -81,7 +80,9 @@ class ArduPilotManager(metaclass=Singleton):
 
     @property
     def platform(self) -> Platform:
-        return self._current_platform
+        if not self._current_board:
+            return Platform.Undefined
+        return self._current_board.platform
 
     @platform.setter
     def platform(self, platform: Platform) -> None:
@@ -119,7 +120,6 @@ class ArduPilotManager(metaclass=Singleton):
         )
 
         self.start_mavlink_manager(master_endpoint)
-        self._current_platform = board.platform
         self._current_board = board
 
     def start_serial(self, board: FlightController) -> None:
@@ -128,7 +128,6 @@ class ArduPilotManager(metaclass=Singleton):
         self.start_mavlink_manager(
             Endpoint("Master", self.settings.app_name, EndpointType.Serial, board.path, 115200, protected=True)
         )
-        self._current_platform = board.platform
         self._current_board = board
 
     def run_with_sitl(self, frame: SITLFrame = SITLFrame.VECTORED) -> None:
@@ -152,7 +151,6 @@ class ArduPilotManager(metaclass=Singleton):
         )
 
         self.start_mavlink_manager(master_endpoint)
-        self._current_platform = Platform.SITL
         self._current_board = board
 
     def start_mavlink_manager(self, device: Endpoint) -> None:
@@ -223,7 +221,7 @@ class ArduPilotManager(metaclass=Singleton):
     async def stop_ardupilot(self) -> None:
         """Stop Ardupilot processes and communication."""
 
-        if not self._current_platform == Platform.SITL:
+        if not self.platform == Platform.SITL:
             try:
                 logger.info("Disarming vehicle.")
                 self.vehicle_manager.disarm_vehicle()
@@ -252,7 +250,7 @@ class ArduPilotManager(metaclass=Singleton):
             self.should_be_running = True
 
     async def restart_ardupilot(self) -> None:
-        if self._current_platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]:
+        if self.platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]:
             await self.stop_ardupilot()
             await self.start_ardupilot()
             return
@@ -322,7 +320,7 @@ class ArduPilotManager(metaclass=Singleton):
                 raise EndpointDeleteFail(f"Failed to remove endpoint '{endpoint.name}': {error}") from error
 
     def get_available_firmwares(self, vehicle: Vehicle) -> List[Firmware]:
-        return self.firmware_manager.get_available_firmwares(vehicle, self._current_platform)
+        return self.firmware_manager.get_available_firmwares(vehicle, self.platform)
 
     def install_firmware_from_file(self, firmware_path: pathlib.Path) -> None:
         if not self._current_board:
