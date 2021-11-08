@@ -1,3 +1,4 @@
+import psutil
 import os
 from typing import List, Optional
 
@@ -5,6 +6,8 @@ from loguru import logger
 from serial.tools.list_ports_linux import SysFS, comports
 from smbus2 import SMBus
 
+from exceptions import UnsupportedPlatform
+from flight_controller.Identifier import BoardIdentifier
 from typedefs import FlightController, Platform
 
 
@@ -110,3 +113,21 @@ class Detector:
         available.extend(Detector().detect_serial_flight_controllers())
 
         return available
+
+    @staticmethod
+    def is_board_connected(board: FlightController) -> bool:
+        connected_boards = Detector.detect()
+        if board.platform in [Platform.GenericSerial, Platform.Pixhawk1, Platform.Pixhawk4]:
+            return board.dict(exclude={"platform", "path"}) in [
+                conn_board.dict(exclude={"platform", "path"}) for conn_board in connected_boards
+            ]
+        if board.platform in [Platform.NavigatorR3, Platform.Navigator]:
+            return board in connected_boards
+        if board.platform == Platform.SITL:
+
+            def is_ardupilot_process(process: psutil.Process) -> bool:
+                return board.platform.value in " ".join(process.cmdline())
+
+            return len(list(filter(is_ardupilot_process, psutil.process_iter()))) != 0
+
+        raise UnsupportedPlatform(f"Board connection check not implementd for {board.platform}.")
