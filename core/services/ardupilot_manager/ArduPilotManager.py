@@ -14,6 +14,7 @@ from exceptions import (
     ArdupilotProcessKillFail,
     EndpointCreationFail,
     EndpointDeleteFail,
+    NoBoardsConnected,
     NoPreferredBoardSet,
 )
 from firmware.FirmwareManagement import FirmwareManager
@@ -83,8 +84,17 @@ class ArduPilotManager(metaclass=Singleton):
             await asyncio.sleep(5.0)
 
     def run_with_board(self) -> None:
-        if not self.start_board(BoardDetector.detect()):
-            logger.warning("Flight controller board not detected.")
+        chosen_board = self.get_board_to_be_used()
+        logger.info(f"Using {chosen_board.name} flight-controller.")
+
+        if chosen_board.platform in [Platform.NavigatorR3, Platform.Navigator]:
+            self.start_navigator(chosen_board)
+            return
+        if chosen_board.platform == Platform.Pixhawk1:
+            self.start_serial(chosen_board)
+            return
+
+        raise RuntimeError(f"Invalid board type: {chosen_board.platform}")
 
     @staticmethod
     def check_running_as_root() -> None:
@@ -236,12 +246,19 @@ class ArduPilotManager(metaclass=Singleton):
             raise NoPreferredBoardSet("Preferred board not set yet.")
         return FlightController(**preferred_board)
 
-    def get_board_to_be_used(self, boards: List[FlightController]) -> FlightController:
+    def get_board_to_be_used(self) -> FlightController:
         """Check if preferred board exists and is connected. If so, use it, otherwise, choose by priority."""
+
+        connected_boards = BoardDetector.detect()
+        if not connected_boards:
+            raise NoBoardsConnected("No flight controller boards detected.")
+        if len(connected_boards) > 1:
+            logger.warning(f"More than a single board detected: {connected_boards}")
+
         try:
             preferred_board = self.get_preferred_board()
             logger.info(f"Preferred flight-controller is {preferred_board.name}.")
-            for board in boards:
+            for board in connected_boards:
                 # Compare connected boards with saved board, excluding path (which can change between sessions)
                 if preferred_board.dict(exclude={"path"}).items() <= board.dict().items():
                     return board
@@ -249,27 +266,8 @@ class ArduPilotManager(metaclass=Singleton):
         except NoPreferredBoardSet as error:
             logger.info(error)
 
-        boards.sort(key=lambda board: board.platform)
-        return boards[0]
-
-    def start_board(self, boards: List[FlightController]) -> bool:
-        if not boards:
-            return False
-
-        if len(boards) > 1:
-            logger.warning(f"More than a single board detected: {boards}")
-
-        flight_controller = self.get_board_to_be_used(boards)
-
-        logger.info(f"Using {flight_controller.name} flight-controller.")
-
-        if flight_controller.platform in [Platform.NavigatorR3, Platform.Navigator]:
-            self.start_navigator(flight_controller)
-            return True
-        if flight_controller.platform == Platform.Pixhawk1:
-            self.start_serial(flight_controller)
-            return True
-        raise RuntimeError("Invalid board type: {boards}")
+        connected_boards.sort(key=lambda board: board.platform)
+        return connected_boards[0]
 
     def running_ardupilot_processes(self) -> List[psutil.Process]:
         """Return list of all Ardupilot process running on system."""
