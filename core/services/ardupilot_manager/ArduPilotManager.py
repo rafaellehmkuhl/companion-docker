@@ -330,12 +330,16 @@ class ArduPilotManager(metaclass=Singleton):
         logger.info("Mavlink manager stopped.")
 
     async def start_ardupilot(self) -> None:
-        if self._desired_platform == Platform.SITL:
-            self.run_with_sitl(self.current_sitl_frame)
+        try:
+            if self._desired_platform == Platform.SITL:
+                self.run_with_sitl(self.current_sitl_frame)
+                return
+            self.run_with_board()
+        except Exception as error:
+            logger.warning(f"Failed to start Ardupilot: {error}.")
+            raise error
+        finally:
             self.should_be_running = True
-            return
-        self.run_with_board()
-        self.should_be_running = True
 
     async def restart_ardupilot(self) -> None:
         if self._current_platform in [Platform.SITL, Platform.Navigator, Platform.NavigatorR3]:
