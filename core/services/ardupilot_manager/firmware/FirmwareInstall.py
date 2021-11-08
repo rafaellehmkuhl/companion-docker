@@ -17,14 +17,8 @@ from exceptions import (
 )
 from firmware.FirmwareDownload import FirmwareDownloader
 from firmware.FirmwareUpload import FirmwareUploader
-from typedefs import FirmwareFormat, Platform
-
-
-def get_board_id(platform: Platform) -> int:
-    ardupilot_board_ids = {
-        Platform.Pixhawk1: 9,
-    }
-    return ardupilot_board_ids.get(platform, -1)
+from flight_controller.Identifier import BoardIdentifier
+from typedefs import FirmwareFormat, FlightController, Platform
 
 
 def get_correspondent_elf_arch(platform_arch: str) -> str:
@@ -57,18 +51,15 @@ class FirmwareInstaller:
         pass
 
     @staticmethod
-    def _validate_apj(firmware_path: pathlib.Path, platform: Platform) -> None:
+    def _validate_apj(firmware_path: pathlib.Path, board_type: int) -> None:
         try:
             with open(firmware_path, "r", encoding="utf-8") as firmware_file:
                 firmware_data = firmware_file.read()
                 firm_board_id = int(json.loads(firmware_data).get("board_id", -1))
-            expected_board_id = get_board_id(platform)
-            if expected_board_id == -1:
-                raise UnsupportedPlatform("Firmware validation is not implemented for this board yet.")
             if firm_board_id == -1:
                 raise InvalidFirmwareFile("Could not find board_id specification in the firmware file.")
-            if firm_board_id != expected_board_id:
-                raise InvalidFirmwareFile(f"Expected board_id {expected_board_id}, found {firm_board_id}.")
+            if firm_board_id != board_type:
+                raise InvalidFirmwareFile(f"Expected board_id {board_type}, found {firm_board_id}.")
             return
         except Exception as error:
             raise InvalidFirmwareFile(f"Could not load firmware file for validation: {error}") from error
@@ -103,19 +94,22 @@ class FirmwareInstaller:
             raise InvalidFirmwareFile("Given firmware is not a supported version.") from error
 
     @staticmethod
-    def validate_firmware(firmware_path: pathlib.Path, platform: Platform) -> None:
+    def validate_firmware(firmware_path: pathlib.Path, board: FlightController) -> None:
         """Check if given firmware is valid for given platform."""
-        if platform == Platform.Undefined:
+        if board.platform == Platform.Undefined:
             raise UndefinedPlatform("Platform is undefined. Cannot validate firmware.")
 
-        firmware_format = FirmwareDownloader._supported_firmware_formats[platform]
+        firmware_format = FirmwareDownloader._supported_firmware_formats[board.platform]
 
         if firmware_format == FirmwareFormat.APJ:
-            FirmwareInstaller._validate_apj(firmware_path, platform)
+            if not board.path:
+                raise ValueError("Board path not available.")
+            expected_board_id = BoardIdentifier.get_board_type(pathlib.Path(board.path))
+            FirmwareInstaller._validate_apj(firmware_path, expected_board_id)
             return
 
         if firmware_format == FirmwareFormat.ELF:
-            FirmwareInstaller._validate_elf(firmware_path, platform)
+            FirmwareInstaller._validate_elf(firmware_path, board.platform)
             return
 
         raise UnsupportedPlatform("Firmware validation is not implemented for this platform.")
@@ -132,7 +126,10 @@ class FirmwareInstaller:
         os.chmod(firmware_path, firmware_path.stat().st_mode | stat.S_IXOTH | stat.S_IXUSR | stat.S_IXGRP)
 
     def install_firmware(
-        self, new_firmware_path: pathlib.Path, platform: Platform, firmware_dest_path: Optional[pathlib.Path] = None
+        self,
+        new_firmware_path: pathlib.Path,
+        board: FlightController,
+        firmware_dest_path: Optional[pathlib.Path] = None,
     ) -> None:
         """Install given firmware."""
         if platform == Platform.Undefined:
@@ -141,15 +138,18 @@ class FirmwareInstaller:
         if not new_firmware_path.is_file():
             raise InvalidFirmwareFile("Given path is not a valid file.")
 
-        firmware_format = FirmwareDownloader._supported_firmware_formats[platform]
+        firmware_format = FirmwareDownloader._supported_firmware_formats[board.platform]
         if firmware_format == FirmwareFormat.ELF:
             self.add_run_permission(new_firmware_path)
 
-        self.validate_firmware(new_firmware_path, platform)
+        self.validate_firmware(new_firmware_path, board)
 
         try:
-            if platform == Platform.Pixhawk1:
+            if board.platform == Platform.Pixhawk1:
                 firmware_uploader = FirmwareUploader()
+                if not board.path:
+                    raise ValueError("Board path not available.")
+                firmware_uploader.set_autopilot_port(pathlib.Path(board.path))
                 firmware_uploader.upload(new_firmware_path)
                 return
             if firmware_format == FirmwareFormat.ELF:

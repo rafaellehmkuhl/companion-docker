@@ -16,6 +16,7 @@ from exceptions import (
     EndpointDeleteFail,
     NoBoardsConnected,
     NoPreferredBoardSet,
+    UndefinedBoard,
 )
 from firmware.FirmwareManagement import FirmwareManager
 from flight_controller.Detector import Detector as BoardDetector
@@ -56,6 +57,8 @@ class ArduPilotManager(metaclass=Singleton):
         self.firmware_manager = FirmwareManager(self.settings.firmware_folder, self.settings.defaults_folder)
         self.vehicle_manager = VehicleManager()
 
+        self._desired_board = self.get_board_to_be_used()
+        self._current_board: Optional[FlightController] = None
         self.should_be_running = False
 
     async def auto_restart_ardupilot(self) -> None:
@@ -88,6 +91,7 @@ class ArduPilotManager(metaclass=Singleton):
         chosen_board = self.get_board_to_be_used()
         logger.info(f"Using {chosen_board.name} flight-controller.")
 
+        self._desired_board = chosen_board
         self._desired_platform = chosen_board.platform
 
         if chosen_board.platform in [Platform.NavigatorR3, Platform.Navigator]:
@@ -124,9 +128,9 @@ class ArduPilotManager(metaclass=Singleton):
         logger.info(f"Setting {frame.value} as frame for SITL.")
 
     def start_navigator(self, board: FlightController) -> None:
-        if not self.firmware_manager.is_firmware_installed(board.platform):
+        if not self.firmware_manager.is_firmware_installed(board):
             if board.platform == Platform.NavigatorR3:
-                self.firmware_manager.install_firmware_from_params(Vehicle.Sub, board.platform)
+                self.firmware_manager.install_firmware_from_params(Vehicle.Sub, board)
             else:
                 self.install_firmware_from_file(
                     pathlib.Path("/root/companion-files/ardupilot-manager/default/ardupilot_navigator_r4")
@@ -168,6 +172,7 @@ class ArduPilotManager(metaclass=Singleton):
 
         self.start_mavlink_manager(master_endpoint)
         self._current_platform = board.platform
+        self._current_board = board
 
     def start_serial(self, board: FlightController) -> None:
         if not board.path:
@@ -175,11 +180,13 @@ class ArduPilotManager(metaclass=Singleton):
         self.start_mavlink_manager(
             Endpoint("Master", self.settings.app_name, EndpointType.Serial, board.path, 115200, protected=True)
         )
-        self.current_platform = board.platform
+        self._current_platform = board.platform
+        self._current_board = board
 
     def run_with_sitl(self, frame: SITLFrame = SITLFrame.VECTORED) -> None:
-        if not self.firmware_manager.is_firmware_installed(Platform.SITL):
-            self.firmware_manager.install_firmware_from_params(Vehicle.Sub, Platform.SITL)
+        board = FlightController(name="SITL", manufacturer="ArduPilot Team", platform=Platform.SITL)
+        if not self.firmware_manager.is_firmware_installed(board):
+            self.firmware_manager.install_firmware_from_params(Vehicle.Sub, board)
         if frame == SITLFrame.UNDEFINED:
             frame = SITLFrame.VECTORED
             logger.warning(f"SITL frame is undefined. Setting {frame} as current frame.")
@@ -415,10 +422,16 @@ class ArduPilotManager(metaclass=Singleton):
         return self.firmware_manager.get_available_firmwares(vehicle, self._current_platform)
 
     def install_firmware_from_file(self, firmware_path: pathlib.Path) -> None:
-        self.firmware_manager.install_firmware_from_file(firmware_path, self._current_platform)
+        if not self._current_board:
+            raise UndefinedBoard("Running board not defined. Cannot install new firmware.")
+        self.firmware_manager.install_firmware_from_file(firmware_path, self._current_board)
 
     def install_firmware_from_url(self, url: str) -> None:
-        self.firmware_manager.install_firmware_from_url(url, self._current_platform)
+        if not self._current_board:
+            raise UndefinedBoard("Running board not defined. Cannot install new firmware.")
+        self.firmware_manager.install_firmware_from_url(url, self._current_board)
 
     def restore_default_firmware(self) -> None:
-        self.firmware_manager.restore_default_firmware(self._current_platform)
+        if not self._current_board:
+            raise UndefinedBoard("Running board not defined. Cannot install new firmware.")
+        self.firmware_manager.restore_default_firmware(self._current_board)

@@ -85,3 +85,7 @@ class UnsupportedBoardType(ValueError):
 
 class BoardBootloaderCommFail(ValueError):
     """Could not communicate with board bootloader."""
+
+
+class UndefinedBoard(ValueError):
+    """Ardupilot board is not set."""
