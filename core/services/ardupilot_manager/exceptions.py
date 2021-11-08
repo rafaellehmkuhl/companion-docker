@@ -77,3 +77,11 @@ class NoPreferredBoardSet(RuntimeError):
 
 class NoBoardsConnected(RuntimeError):
     """No valid boards are connected."""
+
+
+class UnsupportedBoardType(ValueError):
+    """Ardupilot board is not supported."""
+
+
+class BoardBootloaderCommFail(ValueError):
+    """Could not communicate with board bootloader."""
