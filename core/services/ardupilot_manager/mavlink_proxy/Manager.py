@@ -1,10 +1,14 @@
+import asyncio
 import pathlib
-from typing import Any, List, Set, Type
+from typing import List, Set, Type
+
+from loguru import logger
 
 # Plugins
 # pylint: disable=unused-import
 import mavlink_proxy.MAVLinkRouter
 import mavlink_proxy.MAVProxy
+from exceptions import MavlinkRouterStartFail
 from mavlink_proxy.AbstractRouter import AbstractRouter
 from mavlink_proxy.Endpoint import Endpoint
 
@@ -21,6 +25,7 @@ class Manager:
             )
 
         self.tool = available_interfaces[0]()
+        self.should_be_running = False
 
     @staticmethod
     def possible_interfaces() -> List[str]:
@@ -58,13 +63,17 @@ class Manager:
         self.master = master
 
     def start(self) -> None:
+        self.should_be_running = True
         self.tool.start(self.master)
 
     def stop(self) -> None:
+        self.should_be_running = False
         self.tool.exit()
 
     def restart(self) -> None:
+        self.should_be_running = False
         self.tool.restart()
+        self.should_be_running = True
 
     def command_line(self) -> str:
         if not self.master:
@@ -81,5 +90,21 @@ class Manager:
     def set_logdir(self, log_dir: pathlib.Path) -> None:
         self.tool.set_logdir(log_dir)
 
-    def router_process(self) -> Any:
-        return self.tool.process()
+    async def auto_restart_router(self) -> None:
+        """Auto-restart Mavlink router process if it dies."""
+        while True:
+            await asyncio.sleep(5.0)
+
+            needs_restart = self.should_be_running and not self.is_running()
+
+            if not needs_restart:
+                continue
+
+            try:
+                logger.debug("Trying to restart Mavlink router...")
+                self.restart()
+                logger.debug("Mavlink router successfully restarted.")
+            except Exception as error:
+                logger.debug(error)
+
+            self.should_be_running = True
