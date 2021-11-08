@@ -65,3 +65,7 @@ class EndpointCreationFail(RuntimeError):
 
 class EndpointDeleteFail(RuntimeError):
     """Failed to delete endpoint."""
+
+
+class MavlinkRouterStartFail(RuntimeError):
+    """Failed to initiate Mavlink router."""

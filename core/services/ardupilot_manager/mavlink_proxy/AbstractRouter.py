@@ -4,10 +4,12 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+import time
 from typing import Any, List, Optional, Set, Type
 
 from loguru import logger
 
+from exceptions import MavlinkRouterStartFail
 from mavlink_proxy.Endpoint import Endpoint
 
 
@@ -78,6 +80,11 @@ class AbstractRouter(metaclass=abc.ABCMeta):
         logger.debug(f"Calling router using following command: '{command}'.")
         # pylint: disable=consider-using-with
         self._subprocess = subprocess.Popen(shlex.split(command), shell=False, encoding="utf-8", errors="ignore")
+        time.sleep(1)
+
+        if not self.is_running():
+            exit_code = self._subprocess.returncode
+            raise MavlinkRouterStartFail(f"Failed to initialize Mavlink router: exit code {exit_code}.")
 
     def exit(self) -> None:
         if self.is_running():
