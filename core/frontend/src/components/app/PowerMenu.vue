@@ -51,10 +51,9 @@
           <p class="text-md-center">
             {{ service_status_text }}
           </p>
-          <spinning-logo
-            v-if="show_spinner"
-            size="30%"
-          />
+          <div v-if="show_spinner">
+            <spinning-logo size="30%" />
+          </div>
         </v-container>
       </v-card>
     </v-dialog>
