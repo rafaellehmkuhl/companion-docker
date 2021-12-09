@@ -1,3 +1,4 @@
+import ipaddress
 import pathlib
 import shutil
 import subprocess
@@ -12,6 +13,7 @@ class Dnsmasq(metaclass=Singleton):
     def __init__(self, config_path: pathlib.Path) -> None:
         self._subprocess: Optional[Any] = None
         self._interfaces: Set[str] = set()
+        self._gateway_ipv4 = ipaddress.IPv4Address('192.168.2.2')
 
         binary_path = shutil.which(self.binary_name())
         if binary_path is None:
@@ -54,7 +56,13 @@ class Dnsmasq(metaclass=Singleton):
             return False
 
     def command_list(self) -> List[Union[str, pathlib.Path]]:
-        return [self.binary(), f"--interface={','.join(self._interfaces)}", f"--conf-file={self.config_path()}"]
+        return [
+            self.binary(),
+            f"--interface={','.join(self._interfaces)}",
+            f"--dhcp-range={self._ipv4_network_prefix()}.100,{self._ipv4_network_prefix()}.200,255.255.255.0,24h",
+            f"--dhcp-option=option:router,{self._gateway_ipv4}",
+            f"--conf-file={self.config_path()}"
+        ]
 
     def start(self) -> None:
         try:
@@ -93,6 +101,18 @@ class Dnsmasq(metaclass=Singleton):
     @property
     def interfaces(self) -> Set[str]:
         return self._interfaces
+
+    def set_gateway_ipv4(self, ip: ipaddress.IPv4Address) -> None:
+        self._gateway_ipv4 = ip
+        self.restart()
+
+    @property
+    def gateway_ipv4(self) -> ipaddress.IPv4Address:
+        return self._gateway_ipv4
+
+    def _ipv4_network_prefix(self) -> str:
+        network_digits = str(self._gateway_ipv4).split(".")[:3]
+        return ".".join(network_digits)
 
     def __del__(self) -> None:
         self.stop()
