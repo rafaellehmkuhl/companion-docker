@@ -61,7 +61,7 @@ class Dnsmasq(metaclass=Singleton):
             f"--interface={','.join(self._interfaces)}",
             f"--dhcp-range={self._ipv4_network_prefix()}.100,{self._ipv4_network_prefix()}.200,255.255.255.0,24h",
             f"--dhcp-option=option:router,{self._gateway_ipv4}",
-            f"--conf-file={self.config_path()}"
+            f"--conf-file={self.config_path()}",
         ]
 
     def start(self) -> None:
