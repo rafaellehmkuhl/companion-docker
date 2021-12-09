@@ -5,8 +5,10 @@ from typing import Any, List, Optional, Union
 
 from loguru import logger
 
+from commonwealth.utils.Singleton import Singleton
 
-class Dnsmasq:
+
+class Dnsmasq(metaclass=Singleton):
     def __init__(self, config_path: pathlib.Path) -> None:
         self._subprocess: Optional[Any] = None
 
