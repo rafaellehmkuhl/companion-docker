@@ -81,6 +81,14 @@ class EthernetManager:
         result = [interface.dict(exclude={"info"}) for interface in self.result]
         self.settings.save(result)
 
+    def stop(self) -> None:
+        """Perform steps necessary to properly stop the manager."""
+        for interface in self.get_interfaces():
+            self._server.remove_interface(interface.name)
+
+    def __del__(self) -> None:
+        self.stop()
+
     def set_configuration(self, interface: EthernetInterface) -> bool:
         """Modify hardware based in the configuration
 
