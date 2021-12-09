@@ -53,7 +53,7 @@ class Dnsmasq(metaclass=Singleton):
             return False
 
     def command_list(self) -> List[Union[str, pathlib.Path]]:
-        return [self.binary(), "--no-daemon", f"--conf-file={self.config_path()}"]
+        return [self.binary(), f"--conf-file={self.config_path()}"]
 
     def start(self) -> None:
         try:
