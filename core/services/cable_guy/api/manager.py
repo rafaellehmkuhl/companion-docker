@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 import pathlib
 import re
 from enum import Enum
@@ -101,19 +102,25 @@ class EthernetManager:
             logger.error(f"Invalid interface name ('{name}'). Valid names are: {valid_names}")
             return False
 
-        if mode != InterfaceMode.Server and self._server.is_running():
-            logger.debug("Stopping DHCP server.")
-            self._server.stop()
+        if mode != InterfaceMode.Server:
+            logger.debug("Removing interface from DHCP server.")
+            try:
+                self._server.remove_interface(name)
+            except Exception as error:
+                logger.warning(error)
 
         if mode == InterfaceMode.Client:
             self.set_dynamic_ip(name)
             logger.info(f"Interface '{name}' configured with dynamic IP.")
             return True
         if mode == InterfaceMode.Server:
-            self.set_static_ip(name, self._dhcp_server_gateway)
+            self._server.set_gateway_ipv4(ipaddress.IPv4Address(self._dhcp_server_gateway))
+            self.set_static_ip(name, self._server.gateway_ipv4)
             if not self._server.is_running():
                 logger.debug("Starting DHCP server.")
                 self._server.start()
+            logger.debug("Adding interface to DHCP server.")
+            self._server.add_interface(name)
             logger.info(f"Interface '{name}' configured as DHCP server with static IP.")
             return True
         if mode == InterfaceMode.Unmanaged:
@@ -320,10 +327,10 @@ class EthernetManager:
                 ip = address.address if valid_ip else "undefined"
 
                 is_static_ip = self.is_static_ip(ip)
-                is_gateway_ip = ip == self._dhcp_server_gateway
+                is_gateway_ip = ip == self._server.gateway_ipv4
 
                 # Populate our output item
-                if self._server.is_running() and is_gateway_ip:
+                if self._server.is_running() and interface in self._server.interfaces and is_gateway_ip:
                     mode = InterfaceMode.Server
                 else:
                     mode = InterfaceMode.Unmanaged if is_static_ip and valid_ip else InterfaceMode.Client
