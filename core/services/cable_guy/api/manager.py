@@ -102,6 +102,7 @@ class EthernetManager:
             return False
 
         if mode != InterfaceMode.Server and self._server.is_running():
+            logger.debug("Stopping DHCP server.")
             self._server.stop()
 
         if mode == InterfaceMode.Client:
@@ -111,6 +112,7 @@ class EthernetManager:
         if mode == InterfaceMode.Server:
             self.set_static_ip(name, self._dhcp_server_gateway)
             if not self._server.is_running():
+                logger.debug("Starting DHCP server.")
                 self._server.start()
             logger.info(f"Interface '{name}' configured as DHCP server with static IP.")
             return True
