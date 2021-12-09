@@ -1,7 +1,7 @@
 import pathlib
 import shutil
 import subprocess
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, Set, Union
 
 from loguru import logger
 
@@ -11,6 +11,7 @@ from commonwealth.utils.Singleton import Singleton
 class Dnsmasq(metaclass=Singleton):
     def __init__(self, config_path: pathlib.Path) -> None:
         self._subprocess: Optional[Any] = None
+        self._interfaces: Set[str] = set()
 
         binary_path = shutil.which(self.binary_name())
         if binary_path is None:
@@ -21,7 +22,7 @@ class Dnsmasq(metaclass=Singleton):
         assert self.is_binary_working()
 
         self._config_path = config_path
-        assert self.is_valid_config_file()
+        assert self.is_valid_config()
 
     @staticmethod
     def binary_name() -> str:
@@ -44,7 +45,7 @@ class Dnsmasq(metaclass=Singleton):
     def config_path(self) -> pathlib.Path:
         return self._config_path
 
-    def is_valid_config_file(self) -> bool:
+    def is_valid_config(self) -> bool:
         try:
             subprocess.check_output([*self.command_list(), "--test"])
             return True
@@ -53,7 +54,7 @@ class Dnsmasq(metaclass=Singleton):
             return False
 
     def command_list(self) -> List[Union[str, pathlib.Path]]:
-        return [self.binary(), f"--conf-file={self.config_path()}"]
+        return [self.binary(), f"--interface={','.join(self._interfaces)}", f"--conf-file={self.config_path()}"]
 
     def start(self) -> None:
         try:
@@ -77,6 +78,21 @@ class Dnsmasq(metaclass=Singleton):
 
     def is_running(self) -> bool:
         return self._subprocess is not None and self._subprocess.poll() is None
+
+    def add_interface(self, interface_name: str) -> None:
+        self._interfaces.add(interface_name)
+        self.restart()
+
+    def remove_interface(self, interface_name: str) -> None:
+        try:
+            self._interfaces.remove(interface_name)
+        except KeyError as error:
+            raise ValueError(f"DHCP server is not running on interface '{interface_name}'. Cannot remove.") from error
+        self.restart()
+
+    @property
+    def interfaces(self) -> Set[str]:
+        return self._interfaces
 
     def __del__(self) -> None:
         self.stop()
