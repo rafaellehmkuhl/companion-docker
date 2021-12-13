@@ -1,23 +1,31 @@
 <template>
-  <span />
+  <service-updater :fetchers="wifi_fetchers" />
 </template>
 
 <script lang="ts">
 import Vue from 'vue'
 
+import ServiceUpdater from '@/components/app/ServiceUpdater.vue'
 import notifications from '@/store/notifications'
 import wifi from '@/store/wifi'
+import { Fetcher } from '@/types/common'
 import { wifi_service } from '@/types/frontend_services'
 import { SavedNetwork, WPANetwork } from '@/types/wifi'
 import back_axios, { backend_offline_error } from '@/utils/api'
-import { callPeriodically } from '@/utils/helper_functions'
 
 export default Vue.extend({
   name: 'WifiUpdater',
-  mounted() {
-    callPeriodically(this.fetchSavedNetworks, 5000)
-    callPeriodically(this.fetchNetworkStatus, 5000)
-    callPeriodically(this.fetchAvailableNetworks, 10000)
+  components: {
+    ServiceUpdater,
+  },
+  computed: {
+    wifi_fetchers(): Fetcher[] {
+      return [
+        { func: this.fetchNetworkStatus, delay: 5000 },
+        { func: this.fetchAvailableNetworks, delay: 5000 },
+        { func: this.fetchSavedNetworks, delay: 10000 },
+      ]
+    },
   },
   methods: {
     async fetchNetworkStatus(): Promise<void> {
