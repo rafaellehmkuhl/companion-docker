@@ -17,6 +17,11 @@ export interface Service {
   }
 }
 
+export interface Fetcher {
+  func: () => Promise<void>
+  delay: number
+}
+
 export enum Baudrate {
   b9600 = '9600',
   b19200 = '19200',
