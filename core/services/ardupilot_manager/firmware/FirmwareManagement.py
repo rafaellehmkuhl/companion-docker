@@ -41,9 +41,6 @@ class FirmwareManager:
 
     def is_firmware_installed(self, platform: Platform) -> bool:
         """Check if firmware for given platform is installed."""
-        if platform == Platform.Undefined:
-            raise UndefinedPlatform("Platform is undefined. Cannot verify if firmware is installed.")
-
         if platform == Platform.Pixhawk1:
             # Assumes for now that a Pixhawk always has a firmware installed, which is true most of the time
             # TODO: Validate if properly. The uploader tool seems capable of doing this.

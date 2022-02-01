@@ -105,9 +105,6 @@ class FirmwareInstaller:
     @staticmethod
     def validate_firmware(firmware_path: pathlib.Path, platform: Platform) -> None:
         """Check if given firmware is valid for given platform."""
-        if platform == Platform.Undefined:
-            raise UndefinedPlatform("Platform is undefined. Cannot validate firmware.")
-
         firmware_format = FirmwareDownloader._supported_firmware_formats[platform]
 
         if firmware_format == FirmwareFormat.APJ:
@@ -135,9 +132,6 @@ class FirmwareInstaller:
         self, new_firmware_path: pathlib.Path, platform: Platform, firmware_dest_path: Optional[pathlib.Path] = None
     ) -> None:
         """Install given firmware."""
-        if platform == Platform.Undefined:
-            raise UndefinedPlatform("Platform is undefined. Cannot install firmware.")
-
         if not new_firmware_path.is_file():
             raise InvalidFirmwareFile("Given path is not a valid file.")
 

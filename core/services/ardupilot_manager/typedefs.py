@@ -104,7 +104,6 @@ class Platform(str, Enum):
     NavigatorR3 = "navigator"
     NavigatorR5 = "navigator"
     SITL = get_sitl_platform_name(machine())
-    Undefined = "Undefined"
 
     @property
     def type(self) -> PlatformType:
