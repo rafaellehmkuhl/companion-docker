@@ -74,9 +74,6 @@ test $NO_CLEAN || (
 # Start installing necessary files and system configuration
 echo "Going to install companion-docker version ${VERSION}."
 
-echo "Downloading and installing udev rules."
-curl -fsSL $ROOT/install/udev/100.autopilot.rules -o /etc/udev/rules.d/100.autopilot.rules
-
 echo "Disabling automatic Link-local configuration in dhcpd.conf."
 # delete line if it already exists
 sed -i '/noipv4ll/d' /etc/dhcpcd.conf

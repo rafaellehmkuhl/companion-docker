@@ -1,2 +1,0 @@
-SUBSYSTEM=="tty", ATTRS{manufacturer}=="3D Robotics", ATTRS{product}=="PX4*", SYMLINK+="autopilot"
-SUBSYSTEM=="tty", ATTRS{manufacturer}=="ArduPilot", SYMLINK+="autopilot"
