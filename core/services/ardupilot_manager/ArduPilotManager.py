@@ -360,11 +360,17 @@ class ArduPilotManager(metaclass=Singleton):
             self.should_be_running = True
 
     async def restart_ardupilot(self) -> None:
-        if self.current_platform is None or self.current_platform.type in [PlatformType.SITL, PlatformType.Linux]:
-            await self.kill_ardupilot()
-            await self.start_ardupilot()
-            return
-        self.vehicle_manager.reboot_vehicle()
+        logger.info("Restarting ArduPilot.")
+        try:
+            if self.current_platform is None or self.current_platform.type in [PlatformType.SITL, PlatformType.Linux]:
+                await self.kill_ardupilot()
+                await self.start_ardupilot()
+                return
+            self.vehicle_manager.reboot_vehicle()
+        except Exception as error:
+            raise RuntimeError(f"Failed to restart ArduPilot. {error}") from error
+        finally:
+            self.should_be_running = True
 
     def _get_configuration_endpoints(self) -> Set[Endpoint]:
         return {Endpoint(**endpoint) for endpoint in self.configuration.get("endpoints") or []}
