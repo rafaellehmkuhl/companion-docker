@@ -1,3 +1,4 @@
+import asyncio
 import os
 import pathlib
 from copy import deepcopy
@@ -60,6 +61,22 @@ class ArduPilotManager(metaclass=Singleton):
 
     async def start_mavlink_manager_watchdog(self) -> None:
         await self.mavlink_manager.auto_restart_router()
+
+    async def auto_connect_board(self) -> None:
+        """Periodically check for board disconnection and reconnect it."""
+        while True:
+            if self._current_board is not None and not BoardDetector.is_board_connected(self._current_board):
+                logger.warning("Board disconnected. Resetting connection.")
+                self._current_board = None
+
+            if self._current_board is None:
+                logger.warning("Trying board connection.")
+                try:
+                    await self.stop_ardupilot()
+                    await self.start_ardupilot()
+                except Exception as error:
+                    logger.warning(f"Could not connect board. {error}")
+            await asyncio.sleep(5.0)
 
     async def start_ardupilot(self) -> None:
         if self.use_sitl:
