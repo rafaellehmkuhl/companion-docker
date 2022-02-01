@@ -5,7 +5,9 @@ from loguru import logger
 from serial.tools.list_ports_linux import SysFS, comports
 from smbus2 import SMBus
 
-from typedefs import FlightController, Platform
+from exceptions import UnsupportedPlatform
+from flight_controller.ArduPilotBinaryManager import ArduPilotBinaryManager
+from typedefs import FlightController, Platform, PlatformType
 
 
 class Detector:
@@ -109,3 +111,17 @@ class Detector:
         available.extend(Detector().detect_serial_flight_controllers())
 
         return available
+
+    @staticmethod
+    def is_board_connected(board: FlightController) -> bool:
+        connected_boards = Detector.detect()
+        if board.platform.type == PlatformType.Serial:
+            return board.dict(exclude={"platform", "path"}) in [
+                conn_board.dict(exclude={"platform", "path"}) for conn_board in connected_boards
+            ]
+        if board.platform.type == PlatformType.Linux:
+            return board in connected_boards
+        if board.platform == Platform.SITL:
+            return len(ArduPilotBinaryManager.running_ardupilot_processes(board.platform)) != 0
+
+        raise UnsupportedPlatform(f"Board connection check not implementd for {board.platform}.")
