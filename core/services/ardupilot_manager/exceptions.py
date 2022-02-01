@@ -97,3 +97,11 @@ class EndpointDontExist(ValueError):
 
 class NoPreferredBoardSet(RuntimeError):
     """No preferred board is set yet."""
+
+
+class NoBoardsConnected(RuntimeError):
+    """No valid boards are connected."""
+
+
+class UndefinedBoard(ValueError):
+    """Ardupilot board is not set."""

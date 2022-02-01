@@ -15,6 +15,8 @@ from exceptions import (
     EndpointAlreadyExists,
     MavlinkRouterStartFail,
     NoPreferredBoardSet,
+    NoBoardsConnected,
+    UndefinedBoard,
 )
 from firmware.FirmwareManagement import FirmwareManager
 from flight_controller_detector.Detector import Detector as BoardDetector
@@ -39,7 +41,8 @@ class ArduPilotManager(metaclass=Singleton):
         self.settings.create_app_folders()
         self.mavlink_manager = MavlinkManager()
         self.mavlink_manager.set_logdir(self.settings.log_path)
-        self._current_platform: Platform = Platform.Undefined
+        self.use_sitl = False
+        self._current_board: Optional[FlightController] = None
         self._current_sitl_frame: SITLFrame = SITLFrame.UNDEFINED
 
         # Load settings and do the initial configuration
@@ -83,9 +86,24 @@ class ArduPilotManager(metaclass=Singleton):
     async def start_mavlink_manager_watchdog(self) -> None:
         await self.mavlink_manager.auto_restart_router()
 
-    def run_with_board(self) -> None:
-        if not self.start_board(BoardDetector.detect()):
-            logger.warning("Flight controller board not detected.")
+    async def start_ardupilot(self) -> None:
+        if self.use_sitl:
+            self._current_board = FlightController(name="SITL", manufacturer="ArduPilot Team", platform=Platform.SITL)
+        else:
+            self._current_board = self.get_board_to_be_used()
+        logger.info(f"Using {self._current_board.name} flight-controller.")
+
+        try:
+            if self._current_board.platform == Platform.SITL:
+                self.start_sitl(self._current_board, self.current_sitl_frame)
+            elif self._current_board.platform in [Platform.NavigatorR3, Platform.NavigatorR5]:
+                self.start_navigator(self._current_board)
+            elif self._current_board.platform.type == PlatformType.Serial:
+                self.start_serial(self._current_board)
+        except MavlinkRouterStartFail as error:
+            logger.error(f"Failed to start Mavlink router. {error}")
+
+        self.should_be_running = True
 
     @staticmethod
     def check_running_as_root() -> None:
@@ -94,12 +112,10 @@ class ArduPilotManager(metaclass=Singleton):
 
     @property
     def current_platform(self) -> Platform:
-        return self._current_platform
-
-    @current_platform.setter
-    def current_platform(self, platform: Platform) -> None:
-        self._current_platform = platform
-        logger.info(f"Setting {platform} as current platform.")
+        if not self._current_board:
+            logger.warning("No running board. Returning undefined platform.")
+            return Platform.Undefined
+        return self._current_board.platform
 
     @property
     def current_sitl_frame(self) -> SITLFrame:
@@ -111,13 +127,14 @@ class ArduPilotManager(metaclass=Singleton):
         logger.info(f"Setting {frame.value} as frame for SITL.")
 
     def current_firmware_path(self) -> pathlib.Path:
+        if not self._current_board:
+            raise UndefinedBoard("Running board not defined. Cannot retrieve firmware path.")
         return self.firmware_manager.firmware_path(self.current_platform)
 
     def start_navigator(self, board: FlightController) -> None:
-        self.current_platform = board.platform
-        if not self.firmware_manager.is_firmware_installed(self.current_platform):
+        if not self.firmware_manager.is_firmware_installed(board.platform):
             if board.platform == Platform.NavigatorR3:
-                self.firmware_manager.install_firmware_from_params(Vehicle.Sub, self.current_platform)
+                self.firmware_manager.install_firmware_from_params(Vehicle.Sub, board.platform)
             else:
                 self.install_firmware_from_file(
                     pathlib.Path("/root/companion-files/ardupilot-manager/default/ardupilot_navigator_r4")
@@ -164,15 +181,13 @@ class ArduPilotManager(metaclass=Singleton):
     def start_serial(self, board: FlightController) -> None:
         if not board.path:
             raise ValueError(f"Could not find device path for board {board.name}.")
-        self.current_platform = board.platform
         self.start_mavlink_manager(
             Endpoint("Master", self.settings.app_name, EndpointType.Serial, board.path, 115200, protected=True)
         )
 
-    def run_with_sitl(self, frame: SITLFrame = SITLFrame.VECTORED) -> None:
-        self.current_platform = Platform.SITL
-        if not self.firmware_manager.is_firmware_installed(self.current_platform):
-            self.firmware_manager.install_firmware_from_params(Vehicle.Sub, self.current_platform)
+    def start_sitl(self, board: FlightController, frame: SITLFrame = SITLFrame.VECTORED) -> None:
+        if not self.firmware_manager.is_firmware_installed(board.platform):
+            self.firmware_manager.install_firmware_from_params(Vehicle.Sub, board.platform)
         if frame == SITLFrame.UNDEFINED:
             frame = SITLFrame.VECTORED
             logger.warning(f"SITL frame is undefined. Setting {frame} as current frame.")
@@ -253,12 +268,19 @@ class ArduPilotManager(metaclass=Singleton):
             raise NoPreferredBoardSet("Preferred board not set yet.")
         return FlightController(**preferred_board)
 
-    def get_board_to_be_used(self, boards: List[FlightController]) -> FlightController:
+    def get_board_to_be_used(self) -> FlightController:
         """Check if preferred board exists and is connected. If so, use it, otherwise, choose by priority."""
+
+        connected_boards = BoardDetector.detect()
+        if not connected_boards:
+            raise NoBoardsConnected("No flight controller boards detected.")
+        if len(connected_boards) > 1:
+            logger.warning(f"More than a single board detected: {connected_boards}")
+
         try:
             preferred_board = self.get_preferred_board()
             logger.info(f"Preferred flight-controller is {preferred_board.name}.")
-            for board in boards:
+            for board in connected_boards:
                 # Compare connected boards with saved board, excluding path (which can change between sessions)
                 if preferred_board.dict(exclude={"path"}).items() <= board.dict().items():
                     return board
@@ -266,27 +288,8 @@ class ArduPilotManager(metaclass=Singleton):
         except NoPreferredBoardSet as error:
             logger.info(error)
 
-        boards.sort(key=lambda board: board.platform)
-        return boards[0]
-
-    def start_board(self, boards: List[FlightController]) -> bool:
-        if not boards:
-            return False
-
-        if len(boards) > 1:
-            logger.warning(f"More than a single board detected: {boards}")
-
-        flight_controller = self.get_board_to_be_used(boards)
-
-        logger.info(f"Using {flight_controller.name} flight-controller.")
-
-        if flight_controller.platform in [Platform.NavigatorR3, Platform.NavigatorR5]:
-            self.start_navigator(flight_controller)
-            return True
-        if flight_controller.platform.type == PlatformType.Serial:
-            self.start_serial(flight_controller)
-            return True
-        raise RuntimeError("Invalid board type: {boards}")
+        connected_boards.sort(key=lambda board: board.platform)
+        return connected_boards[0]
 
     def running_ardupilot_processes(self) -> List[psutil.Process]:
         """Return list of all Ardupilot process running on system."""
@@ -327,9 +330,8 @@ class ArduPilotManager(metaclass=Singleton):
             try:
                 logger.info("Disarming vehicle.")
                 self.vehicle_manager.disarm_vehicle()
-                logger.info("Vehicle disarmed.")
             except Exception as error:
-                logger.warning(f"Could not disarm vehicle: {error}. Proceeding with kill.")
+                logger.warning(f"Could not disarm vehicle: {error}. Proceeding with system stop.")
 
         # TODO: Add shutdown command on HAL_SITL and HAL_LINUX, changing terminate/prune
         # logic with a simple "self.vehicle_manager.shutdown_vehicle()"
@@ -342,18 +344,7 @@ class ArduPilotManager(metaclass=Singleton):
 
         logger.info("Stopping Mavlink manager.")
         self.mavlink_manager.stop()
-        logger.info("Mavlink manager stopped.")
-
-    async def start_ardupilot(self) -> None:
-        try:
-            if self.current_platform == Platform.SITL:
-                self.run_with_sitl(self.current_sitl_frame)
-                return
-            self.run_with_board()
-        except MavlinkRouterStartFail as error:
-            logger.warning(f"Failed to start Mavlink router. {error}")
-        finally:
-            self.should_be_running = True
+        self._current_board = None
 
     async def restart_ardupilot(self) -> None:
         if self.current_platform.type in [PlatformType.SITL, PlatformType.Linux]:
