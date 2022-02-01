@@ -67,16 +67,10 @@ class ArduPilotManager(metaclass=Singleton):
                 or (self.current_platform.type in [PlatformType.SITL, PlatformType.Linux] and process_not_running)
             )
             if needs_restart:
-                logger.debug("Restarting ardupilot...")
                 try:
-                    await self.kill_ardupilot()
+                    await self.restart_ardupilot()
                 except Exception as error:
-                    logger.warning(f"Could not kill Ardupilot: {error}")
-                try:
-                    await self.start_ardupilot()
-                except Exception as error:
-                    logger.warning(f"Could not start Ardupilot: {error}")
-                self.should_be_running = True
+                    logger.warning(f"ArduPilot auto-restart fail. {error}")
             await asyncio.sleep(5.0)
 
     async def start_mavlink_manager_watchdog(self) -> None:
