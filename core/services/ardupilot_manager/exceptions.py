@@ -105,3 +105,11 @@ class NoBoardsConnected(RuntimeError):
 
 class UndefinedBoard(ValueError):
     """Ardupilot board is not set."""
+
+
+class UnsupportedBoardType(ValueError):
+    """Ardupilot board is not supported."""
+
+
+class BoardBootloaderCommFail(ValueError):
+    """Could not communicate with board bootloader."""
