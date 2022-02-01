@@ -19,7 +19,7 @@ from exceptions import (
     UndefinedBoard,
 )
 from firmware.FirmwareManagement import FirmwareManager
-from flight_controller_detector.Detector import Detector as BoardDetector
+from flight_controller.Detector import Detector as BoardDetector
 from mavlink_proxy.Endpoint import Endpoint
 from mavlink_proxy.Manager import Manager as MavlinkManager
 from settings import Settings

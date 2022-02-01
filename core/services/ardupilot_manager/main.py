@@ -17,7 +17,7 @@ from uvicorn import Config, Server
 
 from ArduPilotManager import ArduPilotManager
 from exceptions import InvalidFirmwareFile
-from flight_controller_detector.Detector import Detector as BoardDetector
+from flight_controller.Detector import Detector as BoardDetector
 from mavlink_proxy.Endpoint import Endpoint
 from typedefs import Firmware, FlightController, Platform, SITLFrame, Vehicle
 
