@@ -258,14 +258,14 @@ class ArduPilotManager(metaclass=Singleton):
         self._save_current_endpoints()
         self.mavlink_manager.restart()
 
-    def get_available_firmwares(self, vehicle: Vehicle, platform: Platform) -> List[Firmware]:
-        return self.firmware_manager.get_available_firmwares(vehicle, platform)
+    def get_available_firmwares(self, vehicle: Vehicle, board: FlightController) -> List[Firmware]:
+        return self.firmware_manager.get_available_firmwares(vehicle, board)
 
-    def install_firmware_from_file(self, firmware_path: pathlib.Path, platform: Platform) -> None:
-        self.firmware_manager.install_firmware_from_file(firmware_path, platform)
+    def install_firmware_from_file(self, firmware_path: pathlib.Path, board: FlightController) -> None:
+        self.firmware_manager.install_firmware_from_file(firmware_path, board)
 
-    def install_firmware_from_url(self, url: str, platform: Platform) -> None:
-        self.firmware_manager.install_firmware_from_url(url, platform)
+    def install_firmware_from_url(self, url: str, board: FlightController) -> None:
+        self.firmware_manager.install_firmware_from_url(url, board)
 
-    def restore_default_firmware(self, platform: Platform) -> None:
-        self.firmware_manager.restore_default_firmware(platform)
+    def restore_default_firmware(self, board: FlightController) -> None:
+        self.firmware_manager.restore_default_firmware(board)
