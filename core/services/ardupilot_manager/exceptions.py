@@ -95,5 +95,21 @@ class EndpointDontExist(ValueError):
     """Given Mavlink endpoint do not exist."""
 
 
-class NoPreferredBoardSet(RuntimeError):
-    """No preferred board is set yet."""
+class BoardIsNotConnected(RuntimeError):
+    """Given board is not connected."""
+
+
+class BoardIsStillConnected(RuntimeError):
+    """Given board is still connected."""
+
+
+class NoRunningBoard(RuntimeError):
+    """Could not detect any running board."""
+
+
+class UnknownBoardProcedure(ValueError):
+    """Procedures are unknown for given board or board type."""
+
+
+class NoAvailableBoard(ValueError):
+    """No board available to proceed."""

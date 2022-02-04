@@ -128,6 +128,10 @@ class FlightController(BaseModel):
     platform: Platform
     path: Optional[str]
 
+    @property
+    def type(self) -> PlatformType:
+        return self.platform.type
+
 
 class FirmwareFormat(str, Enum):
     """Valid firmware formats.
