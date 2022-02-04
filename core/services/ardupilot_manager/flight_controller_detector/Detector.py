@@ -92,7 +92,11 @@ class Detector:
         ]
 
     @staticmethod
-    def detect() -> List[FlightController]:
+    def detect_sitl() -> FlightController:
+        return FlightController(name="SITL", manufacturer="ArduPilot Team", platform=Platform.SITL)
+
+    @staticmethod
+    def detect(include_sitl: bool = True) -> List[FlightController]:
         """Return a list of available flight controllers
 
         Returns:
@@ -107,5 +111,8 @@ class Detector:
             available.append(navigator)
 
         available.extend(Detector().detect_serial_flight_controllers())
+
+        if include_sitl:
+            available.append(Detector.detect_sitl())
 
         return available
