@@ -97,12 +97,11 @@ class PlatformType(LowerStringEnum):
 
 
 class Platform(str, Enum):
-    """Valid Ardupilot platform types.
-    The Enum values are 1:1 representations of the platforms available on the ArduPilot manifest."""
+    """Valid Ardupilot platform types."""
 
+    NavigatorR5 = "navigator_r5"
+    NavigatorR3 = "navigator_r3"
     Pixhawk1 = "Pixhawk1"
-    NavigatorR3 = "navigator"
-    NavigatorR5 = "navigator"
     SITL = get_sitl_platform_name(machine())
 
     @property
@@ -114,6 +113,11 @@ class Platform(str, Enum):
             Platform.SITL: PlatformType.SITL,
         }
         return platform_types.get(self, PlatformType.Unknown)
+
+    @property
+    def manifest_name(self) -> str:
+        """Return 1:1 representation of the platforms available on the ArduPilot manifest."""
+        return "navigator" if "navigator" in self.value else self.value
 
 
 class FlightController(BaseModel):
