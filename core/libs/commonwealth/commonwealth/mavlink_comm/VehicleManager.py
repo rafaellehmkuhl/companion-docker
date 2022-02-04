@@ -72,3 +72,10 @@ class VehicleManager:
             raise VehicleDisarmFail("Failed to disarm vehicle. Please try a manual disarm.")
 
         logger.debug("Successfully disarmed vehicle.")
+
+    def is_heart_beating(self) -> bool:
+        try:
+            return bool(self.mavlink2rest.get_updated_mavlink_message("HEARTBEAT"))
+        except Exception as error:
+            logger.error(f"Fetching for heatbeat failed. {error}")
+            return False
