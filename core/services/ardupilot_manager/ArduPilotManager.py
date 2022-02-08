@@ -8,13 +8,11 @@ from loguru import logger
 
 from exceptions import (
     BoardIsNotConnected,
-    BoardIsStillConnected,
     EndpointAlreadyExists,
-    NoAvailableBoard,
     UnknownBoardProcedure,
 )
 from firmware.FirmwareManagement import FirmwareManager
-from flight_controller.ArduPilotBinaryManager import ArduPilotBinaryManager
+from flight_controller.ArduPilotBinaryManager import ArduPilotBinaryManager, LinuxBinaryManager, SITLBinaryManager
 from flight_controller_detector.Detector import Detector as BoardDetector
 from mavlink_proxy.Endpoint import Endpoint
 from mavlink_proxy.Manager import Manager as MavlinkManager
@@ -46,7 +44,7 @@ class ArduPilotManager(metaclass=Singleton):
         self.configuration = deepcopy(self.settings.content)
         self.firmware_manager = FirmwareManager(self.settings.firmware_folder, self.settings.defaults_folder)
         self.vehicle_manager = VehicleManager()
-        self.binary_manager = ArduPilotBinaryManager()
+        self.binary_manager: Optional[ArduPilotBinaryManager] = None
 
     async def start(self, board: FlightController, sitl_frame: SITLFrame = SITLFrame.VECTORED) -> None:
         """Start a flight-controller (automatically chosen) and add it to the mavlink connection."""
@@ -63,6 +61,24 @@ class ArduPilotManager(metaclass=Singleton):
             await self.stop()
             raise BoardIsNotConnected(f"Failed to connect to '{board.name}' board.")
 
+    def start_board(self, board: FlightController, master_endpoint: Endpoint, sitl_frame: SITLFrame) -> None:
+        """Start given board."""
+        logger.info(f"Starting flight-controller '{board.name}'.")
+        if board.type == PlatformType.Linux:
+            self.binary_manager = LinuxBinaryManager()
+            self.binary_manager.set_log_path(pathlib.Path("f{self.settings.firmware_folder}/logs/"))
+            self.binary_manager.set_storage_path(pathlib.Path("f{self.settings.firmware_folder}/storage/"))
+            self.binary_manager.start(board, master_endpoint, self.firmware_manager.firmware_path(board.platform))
+            return
+        if board.type == PlatformType.SITL:
+            self.binary_manager = SITLBinaryManager()
+            self.binary_manager.set_sitl_frame(sitl_frame)
+            self.binary_manager.start(board, master_endpoint, self.firmware_manager.firmware_path(board.platform))
+            return
+        if board.type == PlatformType.Serial:
+            return
+        raise UnknownBoardProcedure(f"Procedure to start flight-controller of type '{board.type}' is unknown.")
+
     async def stop(self) -> None:
         """Stop any available board and the cease the mavlink connection."""
         logger.info("Stopping all boards and ceasing mavlink connection.")
@@ -70,38 +86,15 @@ class ArduPilotManager(metaclass=Singleton):
             await self.stop_board(board)
         self.mavlink_manager.stop()
 
-    def start_board(self, board: FlightController, master_endpoint: Endpoint, sitl_frame: SITLFrame) -> None:
-        """Start given board."""
-        logger.info(f"Starting flight-controller '{board.name}'.")
-        if board.type == PlatformType.Linux:
-            self.binary_manager.start_linux_binary(
-                board,
-                master_endpoint,
-                self.firmware_manager.firmware_path(board.platform),
-                pathlib.Path("f{self.settings.firmware_folder}/logs/"),
-                pathlib.Path("f{self.settings.firmware_folder}/storage/"),
-            )
-            return
-        if board.type == PlatformType.Serial:
-            return
-        if board.type == PlatformType.SITL:
-            self.binary_manager.start_sitl_binary(
-                board, master_endpoint, self.firmware_manager.firmware_path(board.platform), sitl_frame
-            )
-            return
-        raise UnknownBoardProcedure(f"Procedure to start flight-controller of type '{board.type}' is unknown.")
-
     async def stop_board(self, board: FlightController) -> None:
         """Stop given board."""
         logger.info(f"Stopping flight-controller '{board.name}'.")
-        if board.type == PlatformType.Linux:
-            await self.binary_manager.stop_linux_binary(board)
+        if board.type in [PlatformType.Linux, PlatformType.SITL]:
+            if self.binary_manager is not None:
+                await self.binary_manager.stop()
             return
         if board.type == PlatformType.Serial:
             # Serial boards cannot be stopped.
-            return
-        if board.type == PlatformType.SITL:
-            await self.binary_manager.stop_sitl(board)
             return
         raise UnknownBoardProcedure(f"Procedure to stop board of type '{board.type}' is unknown.")
 
@@ -165,10 +158,6 @@ class ArduPilotManager(metaclass=Singleton):
     async def start_mavlink_manager_watchdog(self) -> None:
         logger.info("Starting watchdog for mavlink manager.")
         await self.mavlink_manager.auto_restart_router()
-
-    async def start_ardupilot_binary_watchdog(self) -> None:
-        logger.info("Starting watchdog for ArduPilot binary.")
-        await self.binary_manager.auto_restart_ardupilot_process()
 
     def _load_default_endpoints(self) -> None:
         logger.info("Adding default endpoints to mavlink connection.")

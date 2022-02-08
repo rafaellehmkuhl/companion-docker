@@ -1,7 +1,6 @@
 #! /usr/bin/env python3
 import argparse
 import asyncio
-from enum import auto
 import logging
 import os
 import shutil
@@ -256,7 +255,5 @@ if __name__ == "__main__":
         chosen_board = Detector.detect_sitl()
 
     loop.create_task(autopilot.start(chosen_board))
-    loop.create_task(autopilot.start_ardupilot_binary_watchdog())
-    loop.create_task(autopilot.start_mavlink_manager_watchdog())
     loop.run_until_complete(server.serve())
     loop.run_until_complete(autopilot.stop())

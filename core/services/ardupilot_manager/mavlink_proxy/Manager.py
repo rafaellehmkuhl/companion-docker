@@ -113,9 +113,24 @@ class Manager:
         self.tool.start(master_endpoint)
         self._last_valid_endpoints = self.endpoints()
 
+        logger.debug("Starting watchdog for Mavlink manager.")
+        try:
+            asyncio.get_running_loop()
+            asyncio.create_task(self.auto_restart_router(), name="mavlink-manager-watchdog")
+        except Exception:
+            logger.warning("No async loop detected. Watchdog won't be running.")
+
     def stop(self) -> None:
         self.should_be_running = False
         self.tool.exit()
+
+        logger.debug("Stopping watchdog for Mavlink manager.")
+        try:
+            asyncio.get_running_loop()
+            (task,) = [task for task in asyncio.all_tasks() if task.get_name() == "mavlink-manager-watchdog"]
+            task.cancel()
+        except Exception:
+            logger.warning("No async loop detected. Watchdog won't be running.")
 
     def restart(self) -> None:
         self.should_be_running = False

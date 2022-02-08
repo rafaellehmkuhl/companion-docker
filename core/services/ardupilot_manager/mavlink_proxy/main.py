@@ -53,7 +53,7 @@ if __name__ == "__main__":
     manager.add_endpoints(args.output.split(":"))
 
     logger.info(f"Command: {manager.command_line()}")
-    manager.start(args.master.split(":"))
+    manager.start(args.master)
     while manager.is_running():
         time.sleep(1)
     logger.info("Done.")

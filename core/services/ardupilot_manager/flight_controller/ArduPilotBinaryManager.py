@@ -1,110 +1,56 @@
+import abc
 import asyncio
 import pathlib
-import subprocess
 from typing import Any, Dict, List, Optional
 
 import psutil
 from loguru import logger
 
-from exceptions import ArdupilotProcessKillFail, UnknownBoardProcedure
+from exceptions import ArdupilotProcessKillFail
 from mavlink_proxy.Endpoint import Endpoint
-from typedefs import FlightController, PlatformType, SITLFrame
+from typedefs import FlightController
 
 
-class ArduPilotBinaryManager:
+class ArduPilotBinaryManager(metaclass=abc.ABCMeta):
     def __init__(self) -> None:
         self._ardupilot_subprocess: Optional[Any] = None
         self._running_board: Optional[FlightController] = None
+        self._master_endpoint: Optional[Endpoint] = None
+        self._firmware_path: Optional[pathlib.Path] = None
 
         self._launch_args: Dict[str, Any] = {}
 
-    def start_linux_binary(  # pylint: disable=too-many-arguments
-        self,
-        board: FlightController,
-        master_endpoint: Endpoint,
-        firmware_path: pathlib.Path,
-        log_path: pathlib.Path,
-        storage_path: pathlib.Path,
-    ) -> None:
-        self._launch_args = {
-            "board": board,
-            "master_endpoint": master_endpoint,
-            "firmware_path": firmware_path,
-            "log_path": log_path,
-            "storage_path": storage_path,
-        }
-        logger.debug(f"Starting binary for board '{board.name}'.")
-        if not board.type == PlatformType.Linux:
-            raise ValueError("Given board is not of Linux type.")
+    @abc.abstractmethod
+    def start(self, board: FlightController, master_endpoint: Endpoint, firmware_path: pathlib.Path) -> None:
         self._running_board = board
-        # Run ardupilot inside while loop to avoid exiting after reboot command
-        ## Can be changed back to a simple command after https://github.com/ArduPilot/ardupilot/issues/17572
-        ## gets fixed.
-        # pylint: disable=consider-using-with
-        #
-        # The mapping of serial ports works as in the following table:
-        #
-        # |    ArduSub   |       Navigator         |
-        # | -C = Serial1 | Serial1 => /dev/ttyS0   |
-        # | -B = Serial3 | Serial3 => /dev/ttyAMA1 |
-        # | -E = Serial4 | Serial4 => /dev/ttyAMA2 |
-        # | -F = Serial5 | Serial5 => /dev/ttyAMA3 |
-        #
-        # The first column comes from https://ardupilot.org/dev/docs/sitl-serial-mapping.html
+        self._master_endpoint = master_endpoint
+        self._firmware_path = firmware_path
 
-        self._ardupilot_subprocess = subprocess.Popen(
-            f"{firmware_path}"
-            f" -A udp:{master_endpoint.place}:{master_endpoint.argument}"
-            f" --log-directory {log_path}"
-            f" --storage-directory {storage_path}"
-            f" -C /dev/ttyS0"
-            f" -B /dev/ttyAMA1"
-            f" -E /dev/ttyAMA2"
-            f" -F /dev/ttyAMA3",
-            shell=True,
-            encoding="utf-8",
-            errors="ignore",
-        )
+        logger.debug("Starting watchdog for ArduPilot binary manager.")
+        try:
+            asyncio.get_running_loop()
+            asyncio.create_task(self.auto_restart_ardupilot_process(), name="ardupilot-binary-watchdog")
+        except Exception:
+            logger.warning("No async loop detected. Watchdog won't be running.")
 
-    def start_sitl_binary(
-        self, board: FlightController, master_endpoint: Endpoint, firmware_path: pathlib.Path, sitl_frame: SITLFrame
-    ) -> None:
-        self._launch_args = {
-            "board": board,
-            "master_endpoint": master_endpoint,
-            "firmware_path": firmware_path,
-            "sitl_frame": sitl_frame,
-        }
-        logger.debug(f"Starting binary for board '{board.name}'.")
-        if not board.type == PlatformType.SITL:
-            raise ValueError("Given board is not of SITL type.")
-        self._running_board = board
-        # Run ardupilot inside while loop to avoid exiting after reboot command
-        # pylint: disable=consider-using-with
-        self._ardupilot_subprocess = subprocess.Popen(
-            [
-                str(firmware_path),
-                "--model",
-                sitl_frame.value,
-                "--base-port",
-                str(master_endpoint.argument),
-                "--home",
-                "-27.563,-48.459,0.0,270.0",
-            ],
-            shell=False,
-            encoding="utf-8",
-            errors="ignore",
-        )
+    async def stop(self) -> None:
+        """Stop board binary, if running."""
+        try:
+            await self.kill_ardupilot_process(self._running_board)
+        except Exception:
+            pass
+        finally:
+            self._running_board = None
+            self._master_endpoint = None
+            self._firmware_path = None
 
-    async def stop_linux_binary(self, board: FlightController) -> None:
-        """Stop Linux board binary, if running."""
-        self._running_board = None
-        await self.kill_ardupilot_process(board)
-
-    async def stop_sitl_binary(self, board: FlightController) -> None:
-        """Stop SITL binary, if running."""
-        self._running_board = None
-        await self.kill_ardupilot_process(board)
+            logger.debug("Stopping watchdog for ArduPilot binary manager.")
+            try:
+                asyncio.get_running_loop()
+                (task,) = [task for task in asyncio.all_tasks() if task.get_name() == "ardupilot-binary-watchdog"]
+                task.cancel()
+            except Exception:
+                logger.warning("No async loop detected. Watchdog won't be running.")
 
     async def kill_ardupilot_process(self, board: FlightController) -> None:
         # TODO: Add shutdown command on HAL_SITL and HAL_LINUX, changing terminate/prune
@@ -167,15 +113,10 @@ class ArduPilotBinaryManager:
 
             logger.debug(f"Restarting binary for '{current_board}' board.")
             try:
-                if current_board.type == PlatformType.Linux:
-                    self.stop_linux_binary(current_board)
-                    self.start_linux_binary(**self._launch_args)
-                    continue
-                if current_board.type == PlatformType.SITL:
-                    self.stop_sitl_binary(current_board)
-                    self.start_sitl_binary(**self._launch_args)
-                    continue
-                raise UnknownBoardProcedure(f"Cannot restart. Procedure for board '{current_board}' is unknown.")
+                self.stop()
+                if None in [self._running_board, self._master_endpoint, self._firmware_path]:
+                    raise ValueError("One or more start parameters is not defined.")
+                self.start(self._running_board, self._master_endpoint, self._firmware_path)
             except Exception as error:
                 logger.warning(f"Could not restart ArduPilot binary. {error}")
             finally:
