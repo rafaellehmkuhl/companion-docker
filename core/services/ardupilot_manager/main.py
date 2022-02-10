@@ -49,9 +49,9 @@ def get_available_endpoints() -> Any:
 
 @app.post("/endpoints", status_code=status.HTTP_201_CREATED)
 @version(1, 0)
-def create_endpoints(endpoints: Set[Endpoint] = Body(...)) -> Any:
+async def create_endpoints(endpoints: Set[Endpoint] = Body(...)) -> Any:
     try:
-        autopilot.add_new_endpoints(endpoints)
+        await autopilot.add_new_endpoints(endpoints)
     except Exception as error:
         logger.error(error)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
@@ -59,9 +59,9 @@ def create_endpoints(endpoints: Set[Endpoint] = Body(...)) -> Any:
 
 @app.delete("/endpoints", status_code=status.HTTP_200_OK)
 @version(1, 0)
-def remove_endpoints(endpoints: Set[Endpoint] = Body(...)) -> Any:
+async def remove_endpoints(endpoints: Set[Endpoint] = Body(...)) -> Any:
     try:
-        autopilot.remove_endpoints(endpoints)
+        await autopilot.remove_endpoints(endpoints)
     except Exception as error:
         logger.error(error)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
@@ -69,9 +69,9 @@ def remove_endpoints(endpoints: Set[Endpoint] = Body(...)) -> Any:
 
 @app.put("/endpoints", status_code=status.HTTP_200_OK)
 @version(1, 0)
-def update_endpoints(endpoints: Set[Endpoint] = Body(...)) -> Any:
+async def update_endpoints(endpoints: Set[Endpoint] = Body(...)) -> Any:
     try:
-        autopilot.update_endpoints(endpoints)
+        await autopilot.update_endpoints(endpoints)
     except Exception as error:
         logger.error(error)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error

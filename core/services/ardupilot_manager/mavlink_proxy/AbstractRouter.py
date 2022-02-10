@@ -1,10 +1,11 @@
 import abc
+import asyncio
+from asyncio import subprocess
 import pathlib
 import shlex
 import shutil
 import tempfile
 import time
-from subprocess import PIPE, Popen
 from typing import Any, List, Optional, Set, Type
 
 from loguru import logger
@@ -18,11 +19,34 @@ from exceptions import (
 from mavlink_proxy.Endpoint import Endpoint
 
 
+async def log_async_subprocess(process: asyncio.subprocess.Process):
+    while True:
+        await asyncio.sleep(0.1)
+        stdout_b: Optional[bytes] = None
+        stderr_b: Optional[bytes] = None
+
+        try:
+            stdout_b = await asyncio.wait_for(process.stdout.readline(), 0.001)
+            if stdout_b:
+                logger.info(stdout_b.decode("utf-8").replace("\n", ""))
+        except Exception:
+            pass
+        try:
+            stderr_b = await asyncio.wait_for(process.stderr.readline(), 0.001)
+            if stderr_b:
+                logger.error(stderr_b.decode("utf-8").replace("\n", ""))
+        except Exception:
+            pass
+
+        if not stdout_b and not stderr_b and process.returncode is not None:
+            break
+
+
 class AbstractRouter(metaclass=abc.ABCMeta):
     def __init__(self) -> None:
         self._endpoints: Set[Endpoint] = set()
         self._master_endpoint: Optional[Endpoint] = None
-        self._subprocess: Optional[Any] = None
+        self._subprocess: Optional[asyncio.subprocess.Process] = None
 
         # Since this methods can fail we need to have the other variables defined
         # to avoid any problem in __del__
@@ -82,34 +106,37 @@ class AbstractRouter(metaclass=abc.ABCMeta):
     def set_master_endpoint(self, master_endpoint: Endpoint) -> None:
         self._master_endpoint = master_endpoint
 
-    def start(self, _verbose: bool = False) -> None:
+    async def start(self, _verbose: bool = False) -> None:
         command = self.assemble_command()
         logger.debug(f"Calling router using following command: '{command}'.")
-        # pylint: disable=consider-using-with
-        self._subprocess = Popen(shlex.split(command), shell=False, encoding="utf-8", stdout=PIPE, stderr=PIPE)
+
+        try:
+            self._subprocess = await asyncio.create_subprocess_shell(
+                command, stdout=asyncio.subprocess.subprocess.PIPE, stderr=asyncio.subprocess.subprocess.PIPE
+            )
+            asyncio.create_task(log_async_subprocess(self._subprocess))
+        except Exception as error:
+            logger.error(f"Could not spawn async stream for Mavlink router subprocess. {error}")
 
         # Since the process takes some time to successfully start or fail, we need to wait before checking it's state
-        time.sleep(1)
+        await asyncio.sleep(1)
         if not self.is_running():
             exit_code = self._subprocess.returncode
-            info, error = self._subprocess.communicate()
-            logger.debug(info)
-            logger.error(error)
-            raise MavlinkRouterStartFail(f"Failed to initialize Mavlink router ({exit_code}): {error}.")
+            raise MavlinkRouterStartFail(f"Failed to initialize Mavlink router. Exit code: {exit_code}.")
 
-    def exit(self) -> None:
+    async def exit(self) -> None:
         if self.is_running():
             assert self._subprocess is not None
-            self._subprocess.kill()
+            await self._subprocess.kill()
         else:
             logger.info("Tried to stop router, but it was already not running.")
 
-    def restart(self) -> None:
-        self.exit()
-        self.start()
+    async def restart(self) -> None:
+        await self.exit()
+        await self.start()
 
     def is_running(self) -> bool:
-        return self._subprocess is not None and self._subprocess.poll() is None
+        return self._subprocess is not None and self._subprocess.returncode is None
 
     def process(self) -> Any:
         assert self._subprocess is not None
@@ -148,4 +175,5 @@ class AbstractRouter(metaclass=abc.ABCMeta):
         self._endpoints = set()
 
     def __del__(self) -> None:
-        self.exit()
+        loop = asyncio.get_running_loop()
+        loop.create_task(self.exit())

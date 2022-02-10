@@ -82,8 +82,9 @@ class ArduPilotManager(metaclass=Singleton):
     async def start_mavlink_manager_watchdog(self) -> None:
         await self.mavlink_manager.auto_restart_router()
 
-    def run_with_board(self) -> None:
-        if not self.start_board(BoardDetector.detect()):
+    async def run_with_board(self) -> None:
+        started = await self.start_board(BoardDetector.detect())
+        if not started:
             logger.warning("Flight controller board not detected.")
 
     @staticmethod
@@ -112,7 +113,7 @@ class ArduPilotManager(metaclass=Singleton):
     def current_firmware_path(self) -> pathlib.Path:
         return self.firmware_manager.firmware_path(self.current_platform)
 
-    def start_navigator(self, board: FlightController) -> None:
+    async def start_navigator(self, board: FlightController) -> None:
         self.current_platform = board.platform
         if not self.firmware_manager.is_firmware_installed(self.current_platform):
             if board.platform == Platform.NavigatorR3:
@@ -158,17 +159,17 @@ class ArduPilotManager(metaclass=Singleton):
             errors="ignore",
         )
 
-        self.start_mavlink_manager(master_endpoint)
+        await self.start_mavlink_manager(master_endpoint)
 
-    def start_serial(self, board: FlightController) -> None:
+    async def start_serial(self, board: FlightController) -> None:
         if not board.path:
             raise ValueError(f"Could not find device path for board {board.name}.")
         self.current_platform = board.platform
-        self.start_mavlink_manager(
+        await self.start_mavlink_manager(
             Endpoint("Master", self.settings.app_name, EndpointType.Serial, board.path, 115200, protected=True)
         )
 
-    def run_with_sitl(self, frame: SITLFrame = SITLFrame.VECTORED) -> None:
+    async def run_with_sitl(self, frame: SITLFrame = SITLFrame.VECTORED) -> None:
         self.current_platform = Platform.SITL
         if not self.firmware_manager.is_firmware_installed(self.current_platform):
             self.firmware_manager.install_firmware_from_params(Vehicle.Sub, self.current_platform)
@@ -199,9 +200,9 @@ class ArduPilotManager(metaclass=Singleton):
             errors="ignore",
         )
 
-        self.start_mavlink_manager(master_endpoint)
+        await self.start_mavlink_manager(master_endpoint)
 
-    def start_mavlink_manager(self, device: Endpoint) -> None:
+    async def start_mavlink_manager(self, device: Endpoint) -> None:
         default_endpoints = [
             Endpoint(
                 "GCS Server Link",
@@ -239,9 +240,9 @@ class ArduPilotManager(metaclass=Singleton):
             except Exception as error:
                 logger.warning(str(error))
         self.mavlink_manager.set_master_endpoint(device)
-        self.mavlink_manager.start()
+        await self.mavlink_manager.start()
 
-    def start_board(self, boards: List[FlightController]) -> bool:
+    async def start_board(self, boards: List[FlightController]) -> bool:
         if not boards:
             return False
 
@@ -255,10 +256,10 @@ class ArduPilotManager(metaclass=Singleton):
         logger.info(f"Board in use: {flight_controller}.")
 
         if flight_controller.platform in [Platform.NavigatorR3, Platform.NavigatorR5]:
-            self.start_navigator(flight_controller)
+            await self.start_navigator(flight_controller)
             return True
         if flight_controller.platform.type == PlatformType.Serial:
-            self.start_serial(flight_controller)
+            await self.start_serial(flight_controller)
             return True
         raise RuntimeError("Invalid board type: {boards}")
 
@@ -315,15 +316,15 @@ class ArduPilotManager(metaclass=Singleton):
         logger.info("Ardupilot's system processes pruned.")
 
         logger.info("Stopping Mavlink manager.")
-        self.mavlink_manager.stop()
+        await self.mavlink_manager.stop()
         logger.info("Mavlink manager stopped.")
 
     async def start_ardupilot(self) -> None:
         try:
             if self.current_platform == Platform.SITL:
-                self.run_with_sitl(self.current_sitl_frame)
+                await self.run_with_sitl(self.current_sitl_frame)
                 return
-            self.run_with_board()
+            await self.run_with_board()
         except MavlinkRouterStartFail as error:
             logger.warning(f"Failed to start Mavlink router. {error}")
         finally:
@@ -362,26 +363,26 @@ class ArduPilotManager(metaclass=Singleton):
         """Get all endpoints from the mavlink manager."""
         return self.mavlink_manager.endpoints()
 
-    def add_new_endpoints(self, new_endpoints: Set[Endpoint]) -> None:
+    async def add_new_endpoints(self, new_endpoints: Set[Endpoint]) -> None:
         """Add multiple endpoints to the mavlink manager and save them on the configuration file."""
         logger.info(f"Adding endpoints {[e.name for e in new_endpoints]} and updating settings file.")
         self.mavlink_manager.add_endpoints(new_endpoints)
         self._save_current_endpoints()
-        self.mavlink_manager.restart()
+        await self.mavlink_manager.restart()
 
-    def remove_endpoints(self, endpoints_to_remove: Set[Endpoint]) -> None:
+    async def remove_endpoints(self, endpoints_to_remove: Set[Endpoint]) -> None:
         """Remove multiple endpoints from the mavlink manager and save them on the configuration file."""
         logger.info(f"Removing endpoints {[e.name for e in endpoints_to_remove]} and updating settings file.")
         self.mavlink_manager.remove_endpoints(endpoints_to_remove)
         self._save_current_endpoints()
-        self.mavlink_manager.restart()
+        await self.mavlink_manager.restart()
 
-    def update_endpoints(self, endpoints_to_update: Set[Endpoint]) -> None:
+    async def update_endpoints(self, endpoints_to_update: Set[Endpoint]) -> None:
         """Update multiple endpoints from the mavlink manager and save them on the configuration file."""
         logger.info(f"Modifying endpoints {[e.name for e in endpoints_to_update]} and updating settings file.")
         self.mavlink_manager.update_endpoints(endpoints_to_update)
         self._save_current_endpoints()
-        self.mavlink_manager.restart()
+        await self.mavlink_manager.restart()
 
     def get_available_firmwares(self, vehicle: Vehicle) -> List[Firmware]:
         return self.firmware_manager.get_available_firmwares(vehicle, self.current_platform)

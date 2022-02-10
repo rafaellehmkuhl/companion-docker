@@ -102,18 +102,18 @@ class Manager:
     def set_master_endpoint(self, master_endpoint: Endpoint) -> None:
         self.tool.set_master_endpoint(master_endpoint)
 
-    def start(self) -> None:
+    async def start(self) -> None:
         self.should_be_running = True
-        self.tool.start()
+        await self.tool.start()
         self._last_valid_endpoints = self.endpoints()
 
-    def stop(self) -> None:
+    async def stop(self) -> None:
         self.should_be_running = False
-        self.tool.exit()
+        await self.tool.exit()
 
-    def restart(self) -> None:
+    async def restart(self) -> None:
         self.should_be_running = False
-        self.tool.restart()
+        await self.tool.restart()
         self._last_valid_endpoints = self.endpoints()
         self.should_be_running = True
 
@@ -141,7 +141,7 @@ class Manager:
 
             logger.debug("Mavlink router stopped. Trying to restart it.")
             try:
-                self.restart()
+                await self.restart()
                 logger.debug("Mavlink router successfully restarted.")
             except Exception as error:
                 logger.error(f"Failed to restart Mavlink router. {error}")
