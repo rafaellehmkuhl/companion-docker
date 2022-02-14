@@ -18,6 +18,8 @@ class BridgetStore extends VuexModule {
 
   available_serial_ports: string[] = []
 
+  should_fetch = false
+
   updating_bridges = true
 
   updating_serial_ports = true
@@ -42,6 +44,16 @@ class BridgetStore extends VuexModule {
   setAvailableSerialPorts(available_serial_ports: string[]): void {
     this.available_serial_ports = available_serial_ports
     this.updating_bridges = false
+  }
+
+  @Mutation
+  startFetching(): void {
+    this.should_fetch = true
+  }
+
+  @Mutation
+  stopFetching(): void {
+    this.should_fetch = false
   }
 }
 

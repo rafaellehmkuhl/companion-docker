@@ -94,6 +94,12 @@ export default Vue.extend({
       return this.available_bridges.length !== 0
     },
   },
+  mounted() {
+    bridget.startFetching()
+  },
+  beforeDestroy() {
+    bridget.stopFetching()
+  },
   methods: {
     openCreationDialog(): void {
       this.show_creation_dialog = true

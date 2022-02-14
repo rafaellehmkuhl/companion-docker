@@ -20,12 +20,21 @@ import { callPeriodically } from '@/utils/helper_functions'
 
 export default Vue.extend({
   name: 'BridgetUpdater',
+  data() {
+    return {
+      prefetched_bridges: false,
+      prefeteched_serial_ports: false,
+    }
+  },
   mounted() {
     callPeriodically(this.fetchAvailableBridges, 5000)
     callPeriodically(this.fetchAvailableSerialPorts, 5000)
   },
   methods: {
     async fetchAvailableBridges(): Promise<void> {
+      if (this.prefetched_bridges && !bridget.should_fetch) {
+        return
+      }
       back_axios({
         method: 'get',
         url: `${bridget.API_URL}/bridges`,
@@ -34,6 +43,7 @@ export default Vue.extend({
         .then((response) => {
           const available_bridges = response.data
           bridget.setAvailableBridges(available_bridges)
+          this.prefetched_bridges = true
         })
         .catch((error) => {
           bridget.setAvailableBridges([])
@@ -46,6 +56,9 @@ export default Vue.extend({
         })
     },
     async fetchAvailableSerialPorts(): Promise<void> {
+      if (this.prefeteched_serial_ports && !bridget.should_fetch) {
+        return
+      }
       back_axios({
         method: 'get',
         url: `${bridget.API_URL}/serial_ports`,
@@ -54,6 +67,7 @@ export default Vue.extend({
         .then((response) => {
           const available_ports = response.data
           bridget.setAvailableSerialPorts(available_ports)
+          this.prefeteched_serial_ports = true
         })
         .catch((error) => {
           bridget.setAvailableSerialPorts([])
