@@ -50,7 +50,6 @@ class EthernetManager:
     def __init__(self, default_config: EthernetInterface, dhcp_gateway: str) -> None:
         self.settings = settings.Settings()
 
-        self._config_path = pathlib.Path(__file__).parent.absolute().joinpath("settings", "dnsmasq.conf")
         self._server = Dnsmasq(self._config_path)
         self._dhcp_server_gateway = dhcp_gateway
 

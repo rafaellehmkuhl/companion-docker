@@ -9,7 +9,7 @@ from loguru import logger
 
 
 class Dnsmasq:
-    def __init__(self, config_path: pathlib.Path, interface: str, ipv4_gateway: IPv4Address) -> None:
+    def __init__(self, interface: str, ipv4_gateway: IPv4Address) -> None:
         self._subprocess: Optional[Any] = None
 
         if interface not in psutil.net_if_stats():
@@ -25,8 +25,6 @@ class Dnsmasq:
 
         self._binary = pathlib.Path(binary_path)
         assert self.is_binary_working()
-
-        self._config_path = config_path
         assert self.is_valid_config()
 
     @staticmethod
@@ -59,14 +57,25 @@ class Dnsmasq:
             return False
 
     def command_list(self) -> List[Union[str, pathlib.Path]]:
+        """List of arguments to be used in the command line call.
+        Refer to https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html for details about each argument."""
+
         return [
             self.binary(),
             "--no-daemon",
             f"--interface={self._interface}",
             f"--dhcp-range={self._ipv4_network_prefix()}.100,{self._ipv4_network_prefix()}.200,255.255.255.0,24h",
             f"--dhcp-option=option:router,{self._ipv4_gateway}",
-            f"--conf-file={self.config_path()}",
             "--bind-interfaces",
+            "--dhcp-option=option6:information-refresh-time,6h",
+            "--dhcp-authoritative",
+            "--dhcp-rapid-commit",
+            "--cache-size=1500",
+            "--no-negcache",
+            "--no-resolv",
+            "--no-poll",
+            "--port=0",
+            "--user=root",
         ]
 
     def start(self) -> None:
