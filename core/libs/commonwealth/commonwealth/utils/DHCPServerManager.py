@@ -1,6 +1,7 @@
 import pathlib
 import shutil
 import subprocess
+from ipaddress import IPv4Address
 from typing import Any, List, Optional, Union
 
 import psutil
@@ -8,12 +9,14 @@ from loguru import logger
 
 
 class Dnsmasq:
-    def __init__(self, config_path: pathlib.Path, interface: str) -> None:
+    def __init__(self, config_path: pathlib.Path, interface: str, ipv4_gateway: IPv4Address) -> None:
         self._subprocess: Optional[Any] = None
 
         if interface not in psutil.net_if_stats():
             raise ValueError(f"Interface '{interface}' not found.")
         self._interface = interface
+
+        self._ipv4_gateway = ipv4_gateway
 
         binary_path = shutil.which(self.binary_name())
         if binary_path is None:
@@ -60,6 +63,8 @@ class Dnsmasq:
             self.binary(),
             "--no-daemon",
             f"--interface={self._interface}",
+            f"--dhcp-range={self._ipv4_network_prefix()}.100,{self._ipv4_network_prefix()}.200,255.255.255.0,24h",
+            f"--dhcp-option=option:router,{self._ipv4_gateway}",
             f"--conf-file={self.config_path()}",
             "--bind-interfaces",
         ]
@@ -90,6 +95,14 @@ class Dnsmasq:
     @property
     def interface(self) -> str:
         return self._interface
+
+    @property
+    def ipv4_gateway(self) -> IPv4Address:
+        return self._ipv4_gateway
+
+    def _ipv4_network_prefix(self) -> str:
+        network_digits = str(self._ipv4_gateway).split(".")[:3]
+        return ".".join(network_digits)
 
     def __del__(self) -> None:
         self.stop()
