@@ -123,6 +123,12 @@ sed -i '/noipv4ll/d' /etc/dhcpcd.conf
 # add noipv4ll
 sed -i '$ a noipv4ll' /etc/dhcpcd.conf
 
+tee -a /etc/dhcpcd.conf << END
+interface uap0
+    static ip_address=192.168.3.2/24
+    nohook wpa_supplicant
+END
+
 echo "Downloading bootstrap"
 COMPANION_BOOTSTRAP="bluerobotics/companion-bootstrap:master" # We don't have others tags for now
 docker pull $COMPANION_BOOTSTRAP
