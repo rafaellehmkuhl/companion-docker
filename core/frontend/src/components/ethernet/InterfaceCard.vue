@@ -34,8 +34,9 @@
             </v-btn>
           </v-col>
         </v-row>
-        <v-row justify="center">
+        <v-row justify="center" class="flex-nowrap">
           <v-btn
+            small
             @click.native.stop="openAddressCreationDialog"
           >
             Add new address
@@ -44,6 +45,29 @@
             v-model="show_creation_dialog"
             :interface-name="adapter.name"
           />
+          <v-btn
+            small
+            class="text--truncate"
+            @click="triggerForDynamicIP"
+          >
+            Get dynamic IP
+          </v-btn>
+          <v-btn
+            v-if="is_there_dhcp_server_already"
+            small
+            class="text-truncate"
+            @click="removeDHCPServer"
+          >
+            Disable DHCP server
+          </v-btn>
+          <v-btn
+            v-else
+            small
+            class="text-truncate"
+            @click="addDHCPServer('192.168.2.2')"
+          >
+            Enable DHCP server
+          </v-btn>
         </v-row>
       </v-container>
     </v-expansion-panel-content>
@@ -85,6 +109,11 @@ export default Vue.extend({
     status_info(): string {
       return this.is_connected ? 'Connected' : 'Not connected'
     },
+    is_there_dhcp_server_already(): boolean {
+      console.log(this.adapter.addresses)
+      console.log(this.adapter.addresses.some((address) => address.mode === AddressMode.server))
+      return this.adapter.addresses.some((address) => address.mode === AddressMode.server)
+    },
   },
   methods: {
     showable_mode_name(mode: AddressMode): string {
@@ -110,6 +139,48 @@ export default Vue.extend({
         .catch((error) => {
           const message = `Could not delete address '${ip}' on '${this.adapter.name}': ${error.message}.`
           notifications.pushError({ service: ethernet_service, type: 'ETHERNET_ADDRESS_DELETE_FAIL', message })
+        })
+    },
+    async triggerForDynamicIP(): Promise<void> {
+      ethernet.setUpdatingInterfaces(true)
+
+      await back_axios({
+        method: 'post',
+        url: `${ethernet.API_URL}/dynamic_ip`,
+        timeout: 10000,
+        params: { interface_name: this.adapter.name },
+      })
+        .catch((error) => {
+          const message = `Could not trigger for dynamic IP address on '${this.adapter.name}': ${error.message}.`
+          notifications.pushError({ service: ethernet_service, type: 'DYNAMIC_IP_TRIGGER_FAIL', message })
+        })
+    },
+    async addDHCPServer(ip: string): Promise<void> {
+      ethernet.setUpdatingInterfaces(true)
+
+      await back_axios({
+        method: 'post',
+        url: `${ethernet.API_URL}/dhcp`,
+        timeout: 10000,
+        params: { interface_name: this.adapter.name, ipv4_gateway: ip },
+      })
+        .catch((error) => {
+          const message = `Could not add DHCP server with gateway '${ip}' to '${this.adapter.name}': ${error.message}.`
+          notifications.pushError({ service: ethernet_service, type: 'DHCP_SERVER_ADD_FAIL', message })
+        })
+    },
+    async removeDHCPServer(): Promise<void> {
+      ethernet.setUpdatingInterfaces(true)
+
+      await back_axios({
+        method: 'delete',
+        url: `${ethernet.API_URL}/dhcp`,
+        timeout: 10000,
+        params: { interface_name: this.adapter.name },
+      })
+        .catch((error) => {
+          const message = `Could not remove DHCP server from interface '${this.adapter.name}': ${error.message}.`
+          notifications.pushError({ service: ethernet_service, type: 'DHCP_SERVER_REMOVE_FAIL', message })
         })
     },
   },
