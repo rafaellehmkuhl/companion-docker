@@ -20,6 +20,7 @@ fi
 SERVICES=(
     'cable_guy',"$SERVICES_PATH/cable_guy/main.py"
     'wifi',"$SERVICES_PATH/wifi/main.py --socket wlan0"
+    'hotspot',"$SERVICES_PATH/wifi/run_ap.py"
     'autopilot',"$SERVICES_PATH/ardupilot_manager/main.py"
     'bridget',"$SERVICES_PATH/bridget/main.py"
     'commander',"$SERVICES_PATH/commander/main.py"
