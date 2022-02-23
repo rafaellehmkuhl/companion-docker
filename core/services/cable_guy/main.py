@@ -158,3 +158,4 @@ if __name__ == "__main__":
     server = Server(config)
 
     loop.run_until_complete(server.serve())
+    manager.stop()
