@@ -26,6 +26,7 @@ class Dnsmasq:
         self._binary = pathlib.Path(binary_path)
         assert self.is_binary_working()
         assert self.is_valid_config()
+        self.start()
 
     @staticmethod
     def binary_name() -> str:
