@@ -24,6 +24,7 @@ COPY tools /home/pi/tools
 RUN /home/pi/tools/ardupilot_tools/bootstrap.sh
 RUN /home/pi/tools/dnsmasq/bootstrap.sh
 RUN /home/pi/tools/filebrowser/bootstrap.sh
+RUN /home/pi/tools/hotspot/bootstrap.sh
 RUN /home/pi/tools/linux2rest/bootstrap.sh
 RUN /home/pi/tools/logviewer/bootstrap.sh
 RUN /home/pi/tools/nginx/bootstrap.sh
