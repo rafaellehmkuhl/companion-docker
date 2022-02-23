@@ -28,6 +28,7 @@ class WifiManager:
         self._updated_scan_results: Optional[List[ScannedWifiNetwork]] = None
         self._ignored_reconnection_networks: List[str] = []
         self.connection_status = ConnectionStatus.UNKNOWN
+        self._hotspot: HotspotManager()
 
     @staticmethod
     def __decode_escaped(data: bytes) -> str:
@@ -180,7 +181,10 @@ class WifiManager:
             network_id {int} -- Network ID provided by WPA Supplicant
         """
         self.connection_status = ConnectionStatus.CONNECTING
+        was_hotspot_enabled = self._hotspot.is_running()
         try:
+            if was_hotspot_enabled:
+                self.enable_hotspot(False)
             await self.wpa.send_command_select_network(network_id)
             await self.wpa.send_command_save_config()
             await self.wpa.send_command_reconfigure()
@@ -208,6 +212,9 @@ class WifiManager:
         except Exception as error:
             self.connection_status = ConnectionStatus.UNKNOWN
             raise ConnectionError(f"Failed to connect to network. {error}") from error
+        finally:
+            if was_hotspot_enabled:
+                self.enable_hotspot(True)
 
     async def status(self) -> Dict[str, Any]:
         """Check wpa_supplicant status"""
@@ -318,3 +325,11 @@ class WifiManager:
                 await self.enable_saved_networks(self._ignored_reconnection_networks)
                 await self.wpa.send_command_reconnect()
                 networks_reenabled = True
+
+    async def enable_hotspot(self, enable: bool) -> None:
+        if enable:
+            logger.info("Enabling hotspot.")
+            self._hotspot.start()
+            return
+        logger.info("Disabling hotspot.")
+        self._hotspot.stop()
