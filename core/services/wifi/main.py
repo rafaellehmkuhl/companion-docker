@@ -170,6 +170,24 @@ async def disconnect() -> Any:
     logger.info("Succesfully disconnected from network.")
 
 
+@app.post("/hotspot", summary="Enable/disable hotspot.")
+@version(1, 0)
+async def toggle_hotspot(enable: bool) -> Any:
+    try:
+        await wifi_manager.enable_hotspot(enable)
+    except Exception as error:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(error)) from error
+
+
+@app.get("/hotspot", summary="Get hotspot state.")
+@version(1, 0)
+async def hotspot_state() -> Any:
+    try:
+        return await wifi_manager._hotspot.is_running()
+    except Exception as error:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(error)) from error
+
+
 app = VersionedFastAPI(app, version="1.0.0", prefix_format="/v{major}.{minor}", enable_latest=True)
 app.mount("/", StaticFiles(directory=str(FRONTEND_FOLDER), html=True))
 
