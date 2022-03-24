@@ -15,6 +15,7 @@
         <v-btn
           :color="active ? 'primary' : ''"
           class="ma-1"
+          :block="$vuetify.breakpoint.smAndDown"
           @click="toggle"
         >
           <v-icon class="mr-2">
@@ -30,6 +31,7 @@
         <v-btn
           :color="active ? 'primary' : ''"
           class="ma-1"
+          :block="$vuetify.breakpoint.smAndDown"
           @click="toggle"
         >
           <v-icon class="mr-2">
@@ -45,6 +47,7 @@
         <v-btn
           :color="active ? 'primary' : ''"
           class="ma-1"
+          :block="$vuetify.breakpoint.smAndDown"
           @click="toggle"
         >
           <v-icon class="mr-2">
@@ -94,6 +97,7 @@
     <v-btn
       :disabled="!allow_installing"
       class="mt-6"
+      :block="$vuetify.breakpoint.smAndDown"
       @click="installFirmware"
     >
       <v-icon>mdi-paperclip</v-icon>
