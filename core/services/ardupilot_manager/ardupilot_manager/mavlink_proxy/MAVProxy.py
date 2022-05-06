@@ -2,9 +2,9 @@ import re
 import subprocess
 from typing import Callable, Optional
 
-from mavlink_proxy.AbstractRouter import AbstractRouter
-from mavlink_proxy.Endpoint import Endpoint
-from typedefs import EndpointType
+from ardupilot_manager.mavlink_proxy.AbstractRouter import AbstractRouter
+from ardupilot_manager.mavlink_proxy.Endpoint import Endpoint
+from ardupilot_manager.typedefs import EndpointType
 
 
 class MAVProxy(AbstractRouter):

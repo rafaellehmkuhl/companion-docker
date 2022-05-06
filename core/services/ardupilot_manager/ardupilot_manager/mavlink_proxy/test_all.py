@@ -12,11 +12,11 @@ import pytest
 # import local library
 sys.path.append(str(pathlib.Path(__file__).absolute().parent.parent))
 
-from mavlink_proxy.AbstractRouter import AbstractRouter
-from mavlink_proxy.Endpoint import Endpoint
-from mavlink_proxy.MAVLinkRouter import MAVLinkRouter
-from mavlink_proxy.MAVProxy import MAVProxy
-from typedefs import EndpointType
+from ardupilot_manager.mavlink_proxy.AbstractRouter import AbstractRouter
+from ardupilot_manager.mavlink_proxy.Endpoint import Endpoint
+from ardupilot_manager.mavlink_proxy.MAVLinkRouter import MAVLinkRouter
+from ardupilot_manager.mavlink_proxy.MAVProxy import MAVProxy
+from ardupilot_manager.typedefs import EndpointType
 
 _, slave_port = pty.openpty()
 serial_port_name = os.ttyname(slave_port)

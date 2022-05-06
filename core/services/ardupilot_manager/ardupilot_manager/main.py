@@ -21,12 +21,14 @@ from fastapi_versioning import VersionedFastAPI, version
 from loguru import logger
 from uvicorn import Config, Server
 
-from ArduPilotManager import ArduPilotManager
-from exceptions import InvalidFirmwareFile
-from flight_controller_detector.Detector import Detector as BoardDetector
-from mavlink_proxy.Endpoint import Endpoint
-from settings import SERVICE_NAME
-from typedefs import Firmware, FlightController, SITLFrame, Vehicle
+from ardupilot_manager.ArduPilotManager import ArduPilotManager
+from ardupilot_manager.exceptions import InvalidFirmwareFile
+from ardupilot_manager.flight_controller_detector.Detector import (
+    Detector as BoardDetector,
+)
+from ardupilot_manager.mavlink_proxy.Endpoint import Endpoint
+from ardupilot_manager.settings import SERVICE_NAME
+from ardupilot_manager.typedefs import Firmware, FlightController, SITLFrame, Vehicle
 
 FRONTEND_FOLDER = Path.joinpath(Path(__file__).parent.absolute(), "frontend")
 

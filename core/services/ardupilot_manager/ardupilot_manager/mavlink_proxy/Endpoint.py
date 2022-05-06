@@ -4,7 +4,7 @@ import validators
 from pydantic import constr, root_validator
 from pydantic.dataclasses import dataclass
 
-from typedefs import EndpointType
+from ardupilot_manager.typedefs import EndpointType
 
 
 @dataclass

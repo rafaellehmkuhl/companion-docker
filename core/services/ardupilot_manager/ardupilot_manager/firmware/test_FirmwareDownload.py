@@ -2,8 +2,8 @@ import os
 
 import pytest
 
-from firmware.FirmwareDownload import FirmwareDownloader
-from typedefs import Platform, Vehicle
+from ardupilot_manager.firmware.FirmwareDownload import FirmwareDownloader
+from ardupilot_manager.typedefs import Platform, Vehicle
 
 
 def test_static() -> None:

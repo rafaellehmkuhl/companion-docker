@@ -13,7 +13,7 @@ from urllib.request import urlopen, urlretrieve
 from loguru import logger
 from packaging.version import Version
 
-from exceptions import (
+from ardupilot_manager.exceptions import (
     FirmwareDownloadFail,
     InvalidManifest,
     ManifestUnavailable,
@@ -21,7 +21,7 @@ from exceptions import (
     NoCandidate,
     NoVersionAvailable,
 )
-from typedefs import FirmwareFormat, Platform, PlatformType, Vehicle
+from ardupilot_manager.typedefs import FirmwareFormat, Platform, PlatformType, Vehicle
 
 # TODO: This should be not necessary
 # Disable SSL verification

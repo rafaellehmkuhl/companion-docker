@@ -9,17 +9,19 @@ from commonwealth.mavlink_comm.VehicleManager import VehicleManager
 from commonwealth.utils.Singleton import Singleton
 from loguru import logger
 
-from exceptions import (
+from ardupilot_manager.exceptions import (
     ArdupilotProcessKillFail,
     EndpointAlreadyExists,
     NoPreferredBoardSet,
 )
-from firmware.FirmwareManagement import FirmwareManager
-from flight_controller_detector.Detector import Detector as BoardDetector
-from mavlink_proxy.Endpoint import Endpoint
-from mavlink_proxy.Manager import Manager as MavlinkManager
-from settings import Settings
-from typedefs import (
+from ardupilot_manager.firmware.FirmwareManagement import FirmwareManager
+from ardupilot_manager.flight_controller_detector.Detector import (
+    Detector as BoardDetector,
+)
+from ardupilot_manager.mavlink_proxy.Endpoint import Endpoint
+from ardupilot_manager.mavlink_proxy.Manager import Manager as MavlinkManager
+from ardupilot_manager.settings import Settings
+from ardupilot_manager.typedefs import (
     EndpointType,
     Firmware,
     FlightController,

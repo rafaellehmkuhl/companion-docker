@@ -9,8 +9,8 @@ from loguru import logger
 # Import local library
 sys.path.append(str(Path(__file__).absolute().parent.parent))
 
-from mavlink_proxy.AbstractRouter import AbstractRouter
-from mavlink_proxy.Manager import Manager
+from ardupilot_manager.mavlink_proxy.AbstractRouter import AbstractRouter
+from ardupilot_manager.mavlink_proxy.Manager import Manager
 
 if __name__ == "__main__":
     manager = Manager()

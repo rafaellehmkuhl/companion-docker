@@ -6,16 +6,16 @@ from loguru import logger
 
 # Plugins
 # pylint: disable=unused-import
-import mavlink_proxy.MAVLinkRouter
-import mavlink_proxy.MAVProxy
-from exceptions import (
+import ardupilot_manager.mavlink_proxy.MAVLinkRouter
+import ardupilot_manager.mavlink_proxy.MAVProxy
+from ardupilot_manager.exceptions import (
     EndpointCreationFail,
     EndpointDeleteFail,
     EndpointUpdateFail,
     NoMasterMavlinkEndpoint,
 )
-from mavlink_proxy.AbstractRouter import AbstractRouter
-from mavlink_proxy.Endpoint import Endpoint
+from ardupilot_manager.mavlink_proxy.AbstractRouter import AbstractRouter
+from ardupilot_manager.mavlink_proxy.Endpoint import Endpoint
 
 
 class Manager:

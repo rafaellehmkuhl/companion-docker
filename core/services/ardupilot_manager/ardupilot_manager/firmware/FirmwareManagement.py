@@ -3,15 +3,15 @@ from typing import List
 
 from loguru import logger
 
-from exceptions import (
+from ardupilot_manager.exceptions import (
     FirmwareInstallFail,
     NoDefaultFirmwareAvailable,
     NoVersionAvailable,
     UnsupportedPlatform,
 )
-from firmware.FirmwareDownload import FirmwareDownloader
-from firmware.FirmwareInstall import FirmwareInstaller
-from typedefs import (
+from ardupilot_manager.firmware.FirmwareDownload import FirmwareDownloader
+from ardupilot_manager.firmware.FirmwareInstall import FirmwareInstaller
+from ardupilot_manager.typedefs import (
     Firmware,
     FirmwareFormat,
     FlightController,

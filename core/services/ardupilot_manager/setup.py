@@ -9,7 +9,7 @@ from warnings import warn
 
 import setuptools
 
-from settings import Settings
+from ardupilot_manager.settings import Settings
 
 ssl._create_default_https_context = ssl._create_unverified_context
 

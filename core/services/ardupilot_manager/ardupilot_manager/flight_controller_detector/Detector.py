@@ -5,7 +5,7 @@ from loguru import logger
 from serial.tools.list_ports_linux import SysFS, comports
 from smbus2 import SMBus
 
-from typedefs import FlightController, Platform
+from ardupilot_manager.typedefs import FlightController, Platform
 
 
 class Detector:

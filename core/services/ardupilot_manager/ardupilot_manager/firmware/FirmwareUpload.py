@@ -6,7 +6,11 @@ import time
 
 from loguru import logger
 
-from exceptions import FirmwareUploadFail, InvalidUploadTool, UploadToolNotFound
+from ardupilot_manager.exceptions import (
+    FirmwareUploadFail,
+    InvalidUploadTool,
+    UploadToolNotFound,
+)
 
 
 class FirmwareUploader:

@@ -9,10 +9,19 @@ from typing import Optional, Union
 from ardupilot_fw_decoder import BoardSubType, BoardType, Decoder
 from elftools.elf.elffile import ELFFile
 
-from exceptions import FirmwareInstallFail, InvalidFirmwareFile, UnsupportedPlatform
-from firmware.FirmwareDownload import FirmwareDownloader
-from firmware.FirmwareUpload import FirmwareUploader
-from typedefs import FirmwareFormat, FlightController, Platform, PlatformType
+from ardupilot_manager.exceptions import (
+    FirmwareInstallFail,
+    InvalidFirmwareFile,
+    UnsupportedPlatform,
+)
+from ardupilot_manager.firmware.FirmwareDownload import FirmwareDownloader
+from ardupilot_manager.firmware.FirmwareUpload import FirmwareUploader
+from ardupilot_manager.typedefs import (
+    FirmwareFormat,
+    FlightController,
+    Platform,
+    PlatformType,
+)
 
 
 def get_board_id(platform: Platform) -> int:

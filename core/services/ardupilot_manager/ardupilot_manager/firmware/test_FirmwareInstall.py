@@ -2,10 +2,10 @@ import pathlib
 
 import pytest
 
-from exceptions import InvalidFirmwareFile
-from firmware.FirmwareDownload import FirmwareDownloader
-from firmware.FirmwareInstall import FirmwareInstaller
-from typedefs import FlightController, Platform, Vehicle
+from ardupilot_manager.exceptions import InvalidFirmwareFile
+from ardupilot_manager.firmware.FirmwareDownload import FirmwareDownloader
+from ardupilot_manager.firmware.FirmwareInstall import FirmwareInstaller
+from ardupilot_manager.typedefs import FlightController, Platform, Vehicle
 
 
 def test_firmware_validation() -> None:

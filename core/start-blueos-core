@@ -21,7 +21,7 @@ SERVICES=(
     'beacon',"$SERVICES_PATH/beacon/main.py"
     'cable_guy',"$SERVICES_PATH/cable_guy/main.py"
     'wifi',"$SERVICES_PATH/wifi/main.py --socket wlan0"
-    'autopilot',"$SERVICES_PATH/ardupilot_manager/main.py"
+    'autopilot',"$SERVICES_PATH/ardupilot_manager/ardupilot_manager/main.py"
     'bridget',"$SERVICES_PATH/bridget/main.py"
     'commander',"$SERVICES_PATH/commander/main.py"
     'nmea_injector',"$SERVICES_PATH/nmea_injector/main.py"
