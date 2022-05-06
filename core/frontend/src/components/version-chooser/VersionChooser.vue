@@ -67,8 +67,11 @@
           @submit.prevent="loadAvailableversions()"
         >
           <v-text-field
+            id="remote_repository"
             v-model="selected_image"
+            autocomplete="on"
             label="Remote repository"
+            name="remote_repository"
           />
         </v-form>
         <v-alert
